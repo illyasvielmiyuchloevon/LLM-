@@ -57,3 +57,16 @@ class GameController:
         else:
             self.ui_manager.display_message("GameController: No adventure preference was provided.", "warning")
             return None
+
+    def generate_blueprint_flow(self) -> bool:
+        self.ui_manager.display_message("GameController: Starting detailed world blueprint generation process...", "info")
+        blueprint_text = self.adventure_setup.generate_detailed_world_blueprint()
+
+        if blueprint_text:
+            self.ui_manager.display_message("GameController: Detailed world blueprint generated successfully.", "info")
+            # Displaying a snippet for confirmation
+            self.ui_manager.display_message(f"GameController: Blueprint Preview (first 100 chars): {blueprint_text[:100]}...", "info")
+            return True
+        else:
+            self.ui_manager.display_message("GameController: Detailed world blueprint generation failed.", "error")
+            return False
