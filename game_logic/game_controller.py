@@ -118,6 +118,35 @@ class GameController:
         # We can add a specific event log for time advancement if desired.
         # For now, the update_state log is sufficient.
 
+    def validate_and_get_action_id(self, command: str, choices: list) -> str | None:
+        try:
+            choice_num = int(command)
+            if 1 <= choice_num <= len(choices):
+                selected_0_based_index = choice_num - 1
+                # Ensure the choice dictionary itself and its 'id' key exist
+                if isinstance(choices[selected_0_based_index], dict) and 'id' in choices[selected_0_based_index]:
+                    return choices[selected_0_based_index].get('id')
+                else:
+                    # This case should ideally not happen if choices are well-formed by LLM
+                    self.ui_manager.display_message(f"Error: Choice format incorrect for command '{command}'. No ID found.", "error")
+                    return None
+            else:
+                # Error message for out-of-range will be handled by the calling context (game_loop)
+                return None
+        except ValueError:
+            # Error message for non-numeric will be handled by the calling context (game_loop)
+            return None
+
+    def handle_game_menu(self):
+        player_state = self.gwhr.get_data_store().get('player_state', {})
+        while True:
+            menu_action_result = self.ui_manager.show_game_systems_menu(player_state)
+            if menu_action_result == 'close_menu':
+                break
+            # elif menu_action_result == 'show_menu_again':
+            #     continue # Loop continues by default
+            # No other actions from this menu result in direct game state changes yet
+
     def initiate_scene(self, scene_id: str) -> bool:
         self.current_game_state = "PRESENTING_SCENE"
         self.ui_manager.display_message(f"GameController: Loading scene '{scene_id}'...", "info")
@@ -271,6 +300,102 @@ class GameController:
                     self.ui_manager.display_message("GameController: Action resulted in a minor or unclear update. Re-displaying current scene context.", "info")
                     self.ui_manager.display_scene(self.gwhr.get_data_store().get('current_scene_data', {}))
 
+                # --- Player Growth/Update Processing ---
+                if 'player_updates' in response_data:
+                    updates_to_log = []
+                    # Get a mutable copy of player_state from GWHR to modify
+                    # Note: get_data_store() returns a deepcopy, so we're modifying a copy.
+                    # We need to explicitly save it back to GWHR if changes are made.
+                    # A more direct approach might be: player_state_ref = self.gwhr.data_store['player_state']
+                    # But to respect GWHR's interface providing copies, let's get, modify, then update.
+                    current_player_state_copy = self.gwhr.get_data_store().get('player_state', {})
+                    player_state_modified = False
+
+                    # Process attribute updates
+                    if 'attributes' in response_data['player_updates']:
+                        attributes_updates = response_data['player_updates']['attributes']
+                        if isinstance(attributes_updates, dict):
+                            player_attributes = current_player_state_copy.setdefault('attributes', {})
+                            for attr, change in attributes_updates.items():
+                                if attr in player_attributes: # Only update existing attributes
+                                    current_value = player_attributes[attr]
+                                    try:
+                                        new_value = current_value # Default if change is invalid
+                                        if isinstance(change, str):
+                                            if change.startswith('+'):
+                                                new_value = current_value + int(change[1:])
+                                            elif change.startswith('-'):
+                                                new_value = current_value - int(change[1:])
+                                            else: # Absolute value
+                                                new_value = int(change)
+                                        elif isinstance(change, (int, float)): # Absolute value
+                                            new_value = int(change) # cast to int just in case
+                                        else:
+                                            self.ui_manager.display_message(f"Warning: Unrecognized attribute change format for {attr}: {change}", "warning")
+                                            continue
+
+                                        player_attributes[attr] = new_value
+                                        player_state_modified = True
+                                        update_msg = f"Attribute {attr} changed from {current_value} to {new_value}."
+                                        self.ui_manager.display_message(update_msg, "growth")
+                                        updates_to_log.append(update_msg)
+                                    except ValueError:
+                                        self.ui_manager.display_message(f"Warning: Invalid value for attribute change {attr}: {change}", "warning")
+                                else:
+                                    self.ui_manager.display_message(f"Warning: Attempt to update unknown attribute {attr}.", "warning")
+                        else:
+                            self.ui_manager.display_message(f"Warning: Malformed 'attributes' in player_updates (not a dict): {attributes_updates}", "warning")
+
+                    # Process skill updates
+                    if 'skills_learned' in response_data['player_updates']:
+                        skills_to_learn_list = response_data['player_updates']['skills_learned']
+                        if isinstance(skills_to_learn_list, list):
+                            player_skills = current_player_state_copy.setdefault('skills', [])
+                            for skill_to_learn in skills_to_learn_list:
+                                if isinstance(skill_to_learn, dict) and 'name' in skill_to_learn:
+                                    existing_skill = next((s for s in player_skills if s.get('name') == skill_to_learn['name']), None)
+                                    if not existing_skill:
+                                        # Ensure default level if not provided
+                                        skill_to_learn.setdefault('level', 1)
+                                        player_skills.append(skill_to_learn) # skill_to_learn is a dict
+                                        player_state_modified = True
+                                        update_msg = f"New skill learned: {skill_to_learn['name']} (Level {skill_to_learn.get('level', 1)})!"
+                                        self.ui_manager.display_message(update_msg, "growth")
+                                        updates_to_log.append(update_msg)
+                                else:
+                                    self.ui_manager.display_message(f"Warning: Malformed skill_learned entry: {skill_to_learn}", "warning")
+                        else:
+                             self.ui_manager.display_message(f"Warning: Malformed 'skills_learned' in player_updates (not a list): {skills_to_learn_list}", "warning")
+
+                    # Process inventory updates
+                    if 'inventory_updates' in response_data['player_updates']:
+                        inventory_changes = response_data['player_updates']['inventory_updates']
+                        if isinstance(inventory_changes, dict):
+                            player_inventory = current_player_state_copy.setdefault('inventory', [])
+                            if 'add' in inventory_changes and isinstance(inventory_changes['add'], list):
+                                for item_to_add in inventory_changes['add']:
+                                    if isinstance(item_to_add, dict) and 'id' in item_to_add and 'name' in item_to_add and 'quantity' in item_to_add:
+                                        existing_item = next((item for item in player_inventory if item.get('id') == item_to_add['id']), None)
+                                        if existing_item:
+                                            existing_item['quantity'] = existing_item.get('quantity', 0) + item_to_add['quantity']
+                                        else:
+                                            player_inventory.append(item_to_add) # item_to_add is a dict
+                                        player_state_modified = True
+                                        update_msg = f"Obtained: {item_to_add['name']} (x{item_to_add['quantity']})."
+                                        self.ui_manager.display_message(update_msg, "growth")
+                                        updates_to_log.append(update_msg)
+                                    else:
+                                        self.ui_manager.display_message(f"Warning: Malformed item_to_add entry: {item_to_add}", "warning")
+                            # TODO: Implement 'remove' logic similarly if needed
+                            # if 'remove' in inventory_changes ...
+                        else:
+                            self.ui_manager.display_message(f"Warning: Malformed 'inventory_updates' in player_updates (not a dict): {inventory_changes}", "warning")
+
+                    if player_state_modified and updates_to_log: # Only update GWHR if actual changes happened
+                        self.gwhr.update_state({'player_state': current_player_state_copy})
+                        self.gwhr.log_event(f"Player growth/update: {'; '.join(updates_to_log)}", event_type="player_update")
+                # --- End Player Growth/Update Processing ---
+
                 self.current_game_state = "AWAITING_PLAYER_ACTION"
             except json.JSONDecodeError as e:
                 self.ui_manager.display_message(f"GameController: Error parsing action response JSON from LLM: {e}. Response snippet: {response_json_str[:200]}...", "error")
@@ -284,31 +409,38 @@ class GameController:
         while self.current_game_state != "GAME_OVER":
             if self.current_game_state == "AWAITING_PLAYER_ACTION":
                 current_scene_data = self.gwhr.get_data_store().get('current_scene_data', {})
-                choices = current_scene_data.get('interactive_elements', [])
+                interactive_choices = current_scene_data.get('interactive_elements', [])
 
-                if not choices:
-                    self.ui_manager.display_message("No interactive actions available in this scene. The story ends here for now.", "info")
-                    self.current_game_state = "GAME_OVER"
-                    # Potentially log this specific game end reason
-                    self.gwhr.log_event("Game ended: No actions available.", event_type="game_flow_end")
+                # Display scene first, which now includes the (M) Game Menu hint
+                self.ui_manager.display_scene(current_scene_data)
+
+                if not interactive_choices: # Check after display_scene, as scene might say "no actions"
+                    self.ui_manager.display_message("No interactive actions presented by the scene. The story might require a different approach or this path ends here.", "info")
+                    self.current_game_state = "GAME_OVER" # Or some other state if game can continue without choices
+                    self.gwhr.log_event("Game ended: No interactive choices available in scene.", event_type="game_flow_end")
                     break
 
-                action_id = self.ui_manager.get_player_action(choices)
-                if action_id:
-                    self.process_player_action(action_type="interact_element", action_detail=action_id)
-                else:
-                    # This case implies get_player_action itself returned None,
-                    # which happens if choices were empty (handled above) or malformed.
-                    # Or if we implement a 'quit' or 'system' command there.
-                    # For now, assume it means the input loop in get_player_action was broken by non-standard means
-                    # or a malformed choice was processed.
-                    self.ui_manager.display_message("GameController: No valid action processed from input. If you see choices, try again.", "warning")
-                    # To prevent tight loop if get_player_action returns None without good reason:
-                    # self.current_game_state = "GAME_OVER" # Or some other recovery
-                    # For now, it will just re-prompt if choices are still available.
+                raw_command = input("Your command (e.g., 1, 2, ..., or M for Menu): ").strip().lower()
 
-            elif self.current_game_state == "GAME_OVER": # Double check, as state can change in process_player_action
-                break # Exit loop
+                if raw_command == 'm':
+                    self.handle_game_menu()
+                    self.ui_manager.display_message("\n--- Returning to game ---", "info")
+                    # Re-display current scene after menu closes to refresh context for player
+                    refreshed_scene_data = self.gwhr.get_data_store().get('current_scene_data', {})
+                    # self.ui_manager.display_scene(refreshed_scene_data) # This would re-print the menu hint.
+                    # The loop will re-enter AWAITING_PLAYER_ACTION and call display_scene.
+                    # So, no explicit re-display here is needed, just let the loop continue.
+                    continue # Continue to next iteration of game_loop to re-evaluate state and display scene
+                else:
+                    action_id = self.validate_and_get_action_id(raw_command, interactive_choices)
+                    if action_id:
+                        self.process_player_action(action_type="interact_element", action_detail=action_id)
+                    else:
+                        self.ui_manager.display_message(f"Invalid command: '{raw_command}'. Please enter a valid action number or 'M' for the menu.", "error")
+                        # Game state remains AWAITING_PLAYER_ACTION, loop will re-prompt after re-displaying scene.
+
+            elif self.current_game_state == "GAME_OVER":
+                break
 
             # Small delay to prevent tight loop if states are rapidly changing without blocking input
             # also makes game feel a bit more paced if LLM responses were instant.

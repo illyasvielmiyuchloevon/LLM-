@@ -104,6 +104,104 @@ class UIManager:
     def show_game_systems_menu_button(self):
         print("\n" + "-"*10 + "[ (M) Game Menu ]" + "-"*10)
 
+    def display_character_status_screen(self, player_data: dict):
+        print("\n" + "="*15 + " CHARACTER STATUS " + "="*15 + "\n")
+
+        attributes = player_data.get('attributes', {})
+        print("--- Attributes ---")
+        print(f"  Strength:     {attributes.get('strength', 'N/A')}")
+        print(f"  Dexterity:    {attributes.get('dexterity', 'N/A')}")
+        print(f"  Intelligence: {attributes.get('intelligence', 'N/A')}")
+        print(f"  Sanity:       {attributes.get('sanity', 'N/A')}")
+        print(f"  Willpower:    {attributes.get('willpower', 'N/A')}")
+        print(f"  Insight:      {attributes.get('insight', 'N/A')}")
+
+        skills = player_data.get('skills', [])
+        print("\n--- Skills ---")
+        if not skills:
+            print("  (No skills learned yet)")
+        else:
+            for skill in skills:
+                print(f"  - {skill.get('name', 'Unknown Skill')} (Lvl: {skill.get('level', 1)})")
+
+        equipment = player_data.get('equipment_slots', {})
+        inventory = player_data.get('inventory', []) # Needed to resolve item names
+        print("\n--- Equipment ---")
+        if not equipment:
+            print("  (No equipment slots defined or all empty)")
+        else:
+            for slot, item_id_or_obj in equipment.items():
+                item_name = "Empty"
+                if item_id_or_obj:
+                    # This simple lookup assumes inventory items have 'id' and 'name'.
+                    # A more robust system would have an item manager or pass resolved item objects.
+                    found_item = next((item for item in inventory if item.get('id') == item_id_or_obj), None)
+                    if found_item:
+                        item_name = found_item.get('name', str(item_id_or_obj))
+                    else: # If it's an object already (not planned yet but for robustness) or ID not found
+                        item_name = str(item_id_or_obj) if not isinstance(item_id_or_obj, dict) else item_id_or_obj.get('name', 'Unknown Equipped Item')
+                print(f"  {slot.capitalize()}: {item_name}")
+
+        print(f"\nLocation: {player_data.get('current_location_id', 'Unknown')}")
+        print("\n" + "="*48)
+        input("--- Press Enter to close ---")
+
+    def display_inventory_screen(self, inventory_list: list):
+        print("\n" + "="*15 + " INVENTORY " + "="*15 + "\n")
+        if not inventory_list:
+            print("  (Inventory is empty)")
+        else:
+            for item in inventory_list:
+                print(f"  - {item.get('name', 'Unknown Item')} (Qty: {item.get('quantity', 1)})")
+                if item.get('description'):
+                    print(f"    '{item.get('description')}'")
+        print("\n" + "="*39)
+        input("--- Press Enter to close ---")
+
+    def display_equipment_screen(self, equipment_slots: dict, inventory_list: list):
+        print("\n" + "="*15 + " EQUIPMENT " + "="*15 + "\n")
+        if not equipment_slots:
+            print("  (No equipment slots defined)")
+        else:
+            for slot, item_id_or_obj in equipment_slots.items():
+                item_name = "Empty"
+                if item_id_or_obj:
+                    found_item = next((item for item in inventory_list if item.get('id') == item_id_or_obj), None)
+                    if found_item:
+                        item_name = found_item.get('name', str(item_id_or_obj))
+                    else:
+                        item_name = str(item_id_or_obj) if not isinstance(item_id_or_obj, dict) else item_id_or_obj.get('name', 'Unknown Equipped Item')
+                print(f"  {slot.capitalize()}: {item_name}")
+        print("\n" + "="*41)
+        input("--- Press Enter to close ---")
+
+    def show_game_systems_menu(self, player_state_data: dict) -> str:
+        print("\n" + "="*15 + " GAME MENU " + "="*15 + "\n")
+        print("  1. Character Status")
+        print("  2. Inventory")
+        print("  3. Equipment")
+        print("  0. Close Menu")
+
+        choice = input("Select an option: ").strip()
+
+        if choice == '1':
+            self.display_character_status_screen(player_state_data)
+            return 'show_menu_again'
+        elif choice == '2':
+            inventory = player_state_data.get('inventory', [])
+            self.display_inventory_screen(inventory)
+            return 'show_menu_again'
+        elif choice == '3':
+            equipment_slots = player_state_data.get('equipment_slots', {})
+            inventory = player_state_data.get('inventory', []) # For name resolution
+            self.display_equipment_screen(equipment_slots, inventory)
+            return 'show_menu_again'
+        elif choice == '0':
+            return 'close_menu'
+        else:
+            self.display_message("Invalid option, please try again.", "error") # Uses existing method
+            return 'show_menu_again'
+
     def display_narrative(self, text: str):
         print("\n" + "-"*10 + " NARRATIVE UPDATE " + "-"*10 + "\n")
         print(text)
