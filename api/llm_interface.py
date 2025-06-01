@@ -59,10 +59,11 @@ class LLMInterface:
     {{"name": "Mysterious Raven", "status": "observing you intently from a nearby branch", "dialogue_hook": "Caw! (It seems to suggest you choose wisely.)"}}
   ],
   "interactive_elements": [
-    {{"id": "go_north_mountains", "description": "Head north towards the towering mountains."}},
-    {{"id": "enter_dark_forest", "description": "Venture east into the ominous dark forest."}},
-    {{"id": "approach_shimmering_lake", "description": "Walk west towards the beautiful shimmering lake."}},
-    {{"id": "inspect_signpost", "description": "Examine the weathered signpost more closely."}}
+    {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}},
+    {{"id": "enter_dark_forest", "name": "Venture east into the ominous dark forest.", "type": "navigate"}},
+    {{"id": "approach_shimmering_lake", "name": "Walk west towards the beautiful shimmering lake.", "type": "navigate"}},
+    {{"id": "inspect_signpost_detail", "name": "Examine the weathered signpost closely.", "type": "examine", "target_id": "signpost_object"}},
+    {{"id": "talk_to_old_man_willow", "name": "Attempt to wake Old Man Willow.", "type": "dialogue", "target_id": "old_man_willow_npc"}}
   ],
   "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes."
 }}

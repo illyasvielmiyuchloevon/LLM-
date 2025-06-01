@@ -80,15 +80,29 @@ class UIManager:
             print(environmental_effects)
 
         interactive_elements = scene_data.get('interactive_elements', [])
-        print("\n--- What do you do? ---")
-        if not interactive_elements:
-            print("There are no obvious actions to take.")
+        print("\n--- What do you do? ---") # This header will be part of display_interaction_menu or its alternative
+        if interactive_elements: # Check if the list exists and is not empty
+            self.display_interaction_menu(interactive_elements)
         else:
-            for i, choice in enumerate(interactive_elements):
-                print(f"  {i+1}. {choice.get('description', 'No description')} (ID: {choice.get('id', 'no_id')})")
+            # Print("\n--- ACTIONS ---") # Replaced by display_interaction_menu's handling or a generic message
+            print("No specific actions seem possible right now.") # Fallback if no elements
 
+        self.show_game_systems_menu_button() # Called at the end of scene display
         print("\n" + "="*20 + " SCENE END " + "="*20 + "\n")
 
+    def display_interaction_menu(self, interactive_elements: list):
+        print("\n--- INTERACTION MENU ---")
+        if not interactive_elements or not isinstance(interactive_elements, list):
+            print("No specific interactions currently available.")
+            return
+
+        for i, element in enumerate(interactive_elements):
+            # Use 'name' for display, fallback to 'id', then to a generic message
+            display_name = element.get('name', element.get('id', 'Unknown Interaction'))
+            print(f"  {i+1}. {display_name}")
+
+    def show_game_systems_menu_button(self):
+        print("\n" + "-"*10 + "[ (M) Game Menu ]" + "-"*10)
 
     def display_narrative(self, text: str):
         print("\n" + "-"*10 + " NARRATIVE UPDATE " + "-"*10 + "\n")

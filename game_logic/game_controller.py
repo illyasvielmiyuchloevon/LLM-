@@ -205,15 +205,18 @@ class GameController:
         if len(context_json_str) > 1000:
             truncated_context_str += "\n... (context truncated)"
 
+        # New prompt structure for process_player_action
+        current_scene_elements = context_for_llm.get('current_scene_data', {}).get('interactive_elements', [])
+        chosen_element_info = next((el for el in current_scene_elements if el.get('id') == action_detail), None)
+        chosen_element_name = chosen_element_info.get('name', action_detail) if chosen_element_info else action_detail
+
         prompt = (
             f"Current Game Context (JSON):\n{truncated_context_str}\n\n"
-            f"Player Action: Interacted with element '{action_detail}' (type: {action_type}) in scene '{current_scene_id_from_gwhr}'.\n\n"
-            "Task: Generate the outcome of this action. This might mean updating the current scene "
-            "(e.g., a narrative update, changed NPC status, modified interactive elements) or transitioning to a new scene. "
-            "If transitioning to a new scene, provide the full data for the new scene, and its 'scene_id' MUST be different "
-            "from the current one ('{current_scene_id_from_gwhr}'). If it's an update to the current scene, "
-            "the 'scene_id' in your response MUST be '{current_scene_id_from_gwhr}', and you should include fields that changed, "
-            "or a 'narrative_update' field for minor text results. Output a single valid JSON object."
+            f"Player selected the option '{chosen_element_name}' (ID: '{action_detail}') from the interaction menu in scene '{current_scene_id_from_gwhr}'.\n\n"
+            f"Task: Generate the outcome of this specific interaction. This might mean updating the current scene (e.g., a narrative update, changed NPC status, modified/new interactive elements) or transitioning to a new scene. "
+            f"If transitioning to a new scene, provide the full data for the new scene, including a new 'scene_id' which MUST be different from '{current_scene_id_from_gwhr}'. "
+            f"If updating the current scene, the response can omit 'scene_id' or use the current one ('{current_scene_id_from_gwhr}'), but should detail changes, potentially including a 'narrative_update' field. "
+            f"Ensure the output is a single valid JSON object structured as scene data."
         )
 
         model_id = self.model_selector.get_selected_model()
