@@ -2,14 +2,16 @@ from api.api_key_manager import ApiKeyManager
 from ui.ui_manager import UIManager
 from engine.model_selector import ModelSelector
 from engine.adventure_setup import AdventureSetup
+from engine.gwhr import GWHR # Import GWHR
 # GameEngine will be imported here later when needed
 
 class GameController:
-    def __init__(self, api_key_manager: ApiKeyManager, ui_manager: UIManager, model_selector: ModelSelector, adventure_setup: AdventureSetup):
+    def __init__(self, api_key_manager: ApiKeyManager, ui_manager: UIManager, model_selector: ModelSelector, adventure_setup: AdventureSetup, gwhr: GWHR): # Add GWHR to constructor
         self.api_key_manager = api_key_manager
         self.ui_manager = ui_manager
         self.model_selector = model_selector
         self.adventure_setup = adventure_setup
+        self.gwhr = gwhr # Store GWHR
         # self.game_engine will be initialized later
 
     def request_and_validate_api_key(self) -> bool:
@@ -69,4 +71,21 @@ class GameController:
             return True
         else:
             self.ui_manager.display_message("GameController: Detailed world blueprint generation failed.", "error")
+            return False
+
+    def initialize_world_from_blueprint_flow(self) -> bool:
+        self.ui_manager.display_message("GameController: Starting World Conception Document generation and GWHR initialization...", "info")
+        world_data_dict = self.adventure_setup.generate_initial_world()
+
+        if world_data_dict:
+            self.ui_manager.display_message("GameController: World Conception Document generated and parsed successfully.", "info")
+            self.gwhr.initialize(world_data_dict) # GWHR will print its own confirmation
+
+            # Verify by fetching title from GWHR
+            retrieved_title = self.gwhr.get_data_store().get('world_title', 'N/A')
+            self.ui_manager.display_message(f"GameController: GWHR has been initialized. World Title from GWHR: '{retrieved_title}'.", "info")
+            return True
+        else:
+            # adventure_setup.generate_initial_world() would have already printed detailed error
+            self.ui_manager.display_message("GameController: Failed to generate or parse World Conception Document. GWHR not initialized.", "error")
             return False

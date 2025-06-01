@@ -27,6 +27,26 @@ class LLMInterface:
             mock_response = f"Mock Detailed World Blueprint: Based on preference supplied in prompt (first 20 chars of prompt: '{prompt_str[:20]}...'). Key elements: ancient ruins, hidden prophecy, mythical creature. Goal: uncover the secrets of the ancients."
             print("LLMInterface: Mock LLM call successful (detailed_world_blueprint).")
             return mock_response
+        elif expected_response_type == 'world_conception_document':
+            # Ensure prompt_str is used for embedding
+            prompt_snippet = prompt_str[:50].replace("\n", " ")
+            mock_json_string = f'''
+{{
+  "world_title": "The Mocked Isle of Eldoria",
+  "setting_description": "A mysterious island generated from a mock LLM call, shrouded in digital mist, home to placeholder ruins and forgotten comment blocks.",
+  "key_locations": [
+    {{"name": "Whispering Code Jungle", "description": "A dense jungle of spaghetti code with hidden functions and strange bugs."}},
+    {{"name": "Sunken Database of Azura", "description": "An ancient database partially corrupted, rumored to hold a powerful primary key."}},
+    {{"name": "Debuggers Peak", "description": "A high stack trace offering a panoramic view, home to a wise, talking rubber duck."}}
+  ],
+  "main_characters": [
+    {{"name": "Captain 'Stacktrace' Silas", "role": "Helper Function", "description": "A grizzled old function who knows the system's secrets."}},
+    {{"name": "NullPointer Witch Lysandra", "role": "Exception", "description": "A sorceress seeking to exploit the system's vulnerabilities."}}
+  ],
+  "initial_plot_hook": "The player's program crashes on the island after a mysterious segmentation fault, driven by rumors of a legendary lost algorithm hidden somewhere on Eldoria. The prompt received started with: '{prompt_snippet}'"
+}}'''
+            print("LLMInterface: Mock LLM call successful (world_conception_document as JSON string).")
+            return mock_json_string
         else:
             # Generic mock response for other types
             mock_response = f"Mock LLM Response for {expected_response_type} using prompt (first 20 chars: '{prompt_str[:20]}...')."
