@@ -1,3 +1,4 @@
+import urllib.parse # For URL encoding image prompt snippets
 from api.api_key_manager import ApiKeyManager # Assuming execution from root or PYTHONPATH configured
 
 class LLMInterface:
@@ -73,3 +74,23 @@ class LLMInterface:
             mock_response = f"Mock LLM Response for {expected_response_type} using prompt (first 20 chars: '{prompt_str[:20]}...')."
             print(f"LLMInterface: Mock LLM call successful ({expected_response_type}).")
             return mock_response
+
+    def generate_image(self, image_prompt: str) -> str | None:
+        api_key = self.api_key_manager.get_api_key()
+        if not api_key:
+            print("LLMInterface: Error - API Key not available. Cannot make Image LLM call.")
+            return None
+
+        print("LLMInterface: Preparing to call Image Generation LLM (imagen-3.0-generate-002 - simulated)...")
+        # Ensure image_prompt is a string before slicing
+        image_prompt_str = str(image_prompt)
+        print(f"  Image Prompt (first 100 chars): {image_prompt_str[:100]}...")
+
+        # Create a URL-encoded snippet of the prompt for the placeholder URL.
+        prompt_for_url = image_prompt_str[:30] # Max 30 chars for the text part of the URL
+        url_encoded_prompt_snippet = urllib.parse.quote(prompt_for_url)
+
+        mock_image_url = f"https://via.placeholder.com/800x600.png?text=Scene:{url_encoded_prompt_snippet}"
+
+        print(f"LLMInterface: Mock Image LLM call successful. Returning URL: {mock_image_url}")
+        return mock_image_url

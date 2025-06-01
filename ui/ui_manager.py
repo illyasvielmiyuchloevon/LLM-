@@ -1,4 +1,13 @@
 class UIManager:
+    def __init__(self):
+        self.current_background_image_url: str | None = None
+
+    def show_image_loading_indicator(self):
+        print("\n[UI IMAGE]: --- Loading scene image ---")
+
+    def hide_image_loading_indicator(self):
+        print("[UI IMAGE]: --- Image loading attempt complete ---")
+
     def show_api_key_screen(self):
         print("UI: Please enter your API Key: ")
 
@@ -36,10 +45,26 @@ class UIManager:
         return preference.strip()
 
     def display_scene(self, scene_data: dict):
-        print("\n" + "="*20 + " SCENE " + "="*20 + "\n")
+        print("\n" + "="*20 + " SCENE START " + "="*20 + "\n")
+
+        # --- Image Part ---
+        new_image_url = scene_data.get('background_image_url')
+        if new_image_url:
+            self.current_background_image_url = new_image_url
+            print("="*15 + " SCENE IMAGE " + "="*15)
+            print(f"[UI IMAGE]: Displaying image from: {self.current_background_image_url}")
+            print("[UI IMAGE]: (Imagine a beautiful, contextually relevant image is displayed here, setting the scene visually.)")
+            print("="*45 + "\n")
+        elif self.current_background_image_url: # No new image, but there was an old one
+            print("\n[UI IMAGE]: (Previous scene image fades or is removed. No new image for this view.)\n")
+            self.current_background_image_url = None
+        # If no new_image_url and no self.current_background_image_url, print nothing for image.
+
+        # --- Textual Content Part ---
+        print("--- SCENE DETAILS ---\n")
 
         narrative = scene_data.get('narrative', 'No narrative provided for this scene.')
-        print(narrative)
+        print(f"Narrative: {narrative}") # Added "Narrative: " prefix for clarity
 
         npcs_in_scene = scene_data.get('npcs_in_scene')
         if npcs_in_scene:
@@ -61,7 +86,9 @@ class UIManager:
         else:
             for i, choice in enumerate(interactive_elements):
                 print(f"  {i+1}. {choice.get('description', 'No description')} (ID: {choice.get('id', 'no_id')})")
-        print("="*50 + "\n") # End of scene separator
+
+        print("\n" + "="*20 + " SCENE END " + "="*20 + "\n")
+
 
     def display_narrative(self, text: str):
         print("\n" + "-"*10 + " NARRATIVE UPDATE " + "-"*10 + "\n")
