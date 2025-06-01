@@ -61,8 +61,9 @@ class GWHR: # GameWorldHistoryRecorder
                     'time': self.data_store.get('current_game_time', 0),
                     'scene_id': new_scene_data.get('scene_id'),
                     'narrative_snippet': (new_scene_data.get('narrative', '')[:50] + "...") if new_scene_data.get('narrative') else "N/A...",
-                    'image_url': new_scene_data.get('background_image_url'), # New
-                    'image_prompt_elements': new_scene_data.get('image_prompt_elements') # New
+                    'image_url': new_scene_data.get('background_image_url'),
+                    'image_prompt_elements': new_scene_data.get('image_prompt_elements'),
+                    'num_interactive_elements': len(new_scene_data.get('interactive_elements', [])) # New
                 }
                 scene_history.append(scene_summary)
                 updated_keys.append(key)
