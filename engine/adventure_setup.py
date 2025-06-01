@@ -1,3 +1,4 @@
+import json # For parsing JSON string from LLM
 from ui.ui_manager import UIManager
 from api.llm_interface import LLMInterface
 from engine.model_selector import ModelSelector
@@ -9,6 +10,7 @@ class AdventureSetup:
         self.model_selector = model_selector
         self.adventure_preference: str | None = None
         self.detailed_world_blueprint: str | None = None
+        self.world_conception_document: dict | None = None # New attribute
 
     def _engine_guidelines(self) -> str:
         return "Engine Guidelines: The world must be coherent and offer multiple paths. Include at least one friendly NPC and one potential adversary. The primary goal should be discoverable through exploration or interaction. Ensure there's a sense of mystery."
@@ -73,3 +75,51 @@ class AdventureSetup:
 
     def get_detailed_world_blueprint(self) -> str | None:
         return self.detailed_world_blueprint
+
+    def generate_initial_world(self) -> dict | None:
+        detailed_blueprint = self.get_detailed_world_blueprint()
+        selected_model_id = self.model_selector.get_selected_model()
+
+        if not detailed_blueprint:
+            self.ui_manager.display_message("AdventureSetup: Error - Detailed World Blueprint not available. Cannot generate world conception.", "error")
+            return None
+
+        if not selected_model_id:
+            self.ui_manager.display_message("AdventureSetup: Error - Model not selected. Cannot generate world conception.", "error")
+            return None
+
+        prompt = (
+            f"Detailed World Blueprint is as follows:\n---BEGIN BLUEPRINT---\n{detailed_blueprint}\n---END BLUEPRINT---\n\n"
+            "Task: Based *only* on the Detailed World Blueprint provided above, generate a comprehensive World Conception Document. "
+            "This document *must* be a single, valid JSON object. The JSON object should include a root-level 'world_title' (string), "
+            "'setting_description' (string), 'key_locations' (list of objects, each with 'name' and 'description' strings), "
+            "'main_characters' (list of objects, each with 'name', 'role', and 'description' strings), "
+            "and an 'initial_plot_hook' (string). Ensure all text strings are appropriately escaped for JSON."
+        )
+
+        self.ui_manager.display_message("AdventureSetup: Requesting World Conception Document (JSON) from LLM...", "info")
+        json_string = self.llm_interface.generate(
+            prompt,
+            selected_model_id,
+            expected_response_type='world_conception_document'
+        )
+
+        if json_string:
+            try:
+                parsed_dict = json.loads(json_string)
+                self.world_conception_document = parsed_dict
+                self.ui_manager.display_message("AdventureSetup: World Conception Document received and successfully parsed as JSON.", "info")
+                return parsed_dict
+            except json.JSONDecodeError as e:
+                # Log a snippet of the problematic string, as it might be very long
+                error_snippet = json_string[:200] + "..." if len(json_string) > 200 else json_string
+                self.ui_manager.display_message(f"AdventureSetup: Critical Error - Failed to parse World Conception Document JSON. Error: {e}. Received string: {error_snippet}", "error")
+                self.world_conception_document = None # Ensure it's None on error
+                return None
+        else:
+            self.ui_manager.display_message("AdventureSetup: Failed to generate World Conception Document from LLM (LLM returned None).", "error")
+            self.world_conception_document = None # Ensure it's None on error
+            return None
+
+    def get_world_conception_document(self) -> dict | None:
+        return self.world_conception_document
