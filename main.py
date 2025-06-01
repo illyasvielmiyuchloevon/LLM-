@@ -4,10 +4,10 @@ from engine.game_engine import GameEngine
 from game_logic.game_controller import GameController
 from engine.model_selector import ModelSelector
 from engine.adventure_setup import AdventureSetup
-from api.api_key_manager import ApiKeyManager
+# ApiKeyManager is already imported once at the top
 from api.llm_interface import LLMInterface
 from engine.gwhr import GWHR # Import GWHR
-from ui.ui_manager import UIManager # Ensure UIManager is imported
+# UIManager is already imported once at the top
 
 if __name__ == "__main__":
     ui_manager = UIManager()
@@ -24,7 +24,8 @@ if __name__ == "__main__":
         ui_manager=ui_manager,
         model_selector=model_selector,
         adventure_setup=adventure_setup,
-        gwhr=gwhr # Pass GWHR to GameController
+        gwhr=gwhr, # Pass GWHR to GameController
+        llm_interface=llm_interface # Add missing llm_interface
     )
 
     ui_manager.display_message("Main: Starting application setup...", "info")
@@ -49,7 +50,8 @@ if __name__ == "__main__":
                     if world_initialized:
                         ui_manager.display_message("Main: World Conception Document generated and GWHR successfully initialized.", "info")
                         ui_manager.display_message("Main: System ready for Phase 5 (Basic Game Loop & Scene Presentation).", "info")
-                        game_engine.start_game_loop() # Placeholder for actual game start
+                        # game_engine.start_game_loop() # Placeholder for actual game start - REMOVE THIS
+                        game_controller.start_game() # CALL NEW GAME CONTROLLER START
                     else:
                         ui_manager.display_message("Main: Failed to generate World Conception Document or initialize GWHR. Cannot proceed.", "error")
                 else:
