@@ -2,35 +2,55 @@ import copy
 
 class GWHR: # GameWorldHistoryRecorder
     def __init__(self):
+        default_player_state = {
+            'attributes': {
+                "strength": 10, "dexterity": 10, "intelligence": 10,
+                "sanity": 100, "willpower": 100, "insight": 5
+            },
+            'skills': [],
+            'inventory': [],
+            'equipment_slots': {
+                "head": None, "torso": None, "hands": None,
+                "legs": None, "feet": None, "main_hand": None, "off_hand": None
+            },
+            'current_location_id': None
+        }
         self.data_store: dict = {
             'current_game_time': 0,
             'scene_history': [],
             'event_log': [],
-            'current_scene_data': {}
+            'current_scene_data': {},
+            'player_state': copy.deepcopy(default_player_state) # Initialize with default player state
         }
 
     def initialize(self, initial_world_data: dict):
-        # Start with a fresh set of defaults for GWHR-specific keys
-        self.data_store = {
-            'current_game_time': 0,
-            'scene_history': [],
-            'event_log': [],
-            'current_scene_data': {}
-        }
-        # Then, deepcopy and update with initial_world_data.
-        # This ensures initial_world_data overwrites any common keys (like 'world_title')
-        # but GWHR specific keys are preserved if not in initial_world_data.
-        current_store = copy.deepcopy(initial_world_data)
+        # Create a deep copy of the incoming data to avoid modifying the original
+        processed_initial_data = copy.deepcopy(initial_world_data)
 
-        # Ensure GWHR specific keys are present, using setdefault for those not typically in WCD
-        current_store.setdefault('current_game_time', self.data_store['current_game_time'])
-        current_store.setdefault('scene_history', list(self.data_store['scene_history'])) # ensure list copy
-        current_store.setdefault('event_log', list(self.data_store['event_log'])) # ensure list copy
-        current_store.setdefault('current_scene_data', dict(self.data_store['current_scene_data'])) # ensure dict copy
+        # Handle player_state separately: if present in initial_world_data, it overrides the default.
+        # Otherwise, the default from __init__ is kept.
+        if 'player_state' in processed_initial_data:
+            # Assume initial_world_data['player_state'] is complete if provided
+            self.data_store['player_state'] = copy.deepcopy(processed_initial_data.pop('player_state'))
+        # else: player_state remains as the default from __init__
 
-        self.data_store = current_store
+        # Update the rest of self.data_store with other keys from initial_world_data
+        # This will overwrite common keys like 'world_title' if present in processed_initial_data,
+        # and add any other new keys from processed_initial_data.
+        self.data_store.update(processed_initial_data)
 
-        print(f"GWHR: Initialized. World Title: '{self.data_store.get('world_title', 'N/A')}'. Game Time: {self.data_store.get('current_game_time')}.")
+        # Ensure other GWHR specific keys (not player_state which is handled above)
+        # have their defaults from __init__ if not provided by initial_world_data
+        # (though .update() would have added them if they were in processed_initial_data)
+        # This setdefault logic is more about ensuring they exist if initial_world_data was minimal.
+        # Given __init__ now sets them, this is more of a safeguard or for clarity.
+        self.data_store.setdefault('current_game_time', 0)
+        self.data_store.setdefault('scene_history', [])
+        self.data_store.setdefault('event_log', [])
+        self.data_store.setdefault('current_scene_data', {})
+
+        print(f"GWHR: Initialized/Merged with world data. World Title: '{self.data_store.get('world_title', 'N/A')}'")
+        print(f"GWHR: Player state attributes: {self.data_store.get('player_state', {}).get('attributes')}")
 
     def log_event(self, event_description: str, event_type: str = "general", causal_factors: list = None):
         event_log = self.data_store.setdefault('event_log', [])
