@@ -159,6 +159,24 @@ class GameController:
                     )
                     scene_data['scene_id'] = scene_id # Force consistency
 
+                # --- Image Generation for new scene ---
+                narrative_for_prompt = scene_data.get('narrative', '')
+                npcs_for_prompt = ", ".join([npc.get('name', 'N/A') for npc in scene_data.get('npcs_in_scene', []) if npc.get('name')])
+                image_prompt_text = f"Scene: {narrative_for_prompt[:150]}. NPCs: {npcs_for_prompt[:100]}."
+                scene_data['image_prompt_elements'] = [image_prompt_text] # Store the generated prompt
+
+                self.ui_manager.show_image_loading_indicator()
+                image_url = self.llm_interface.generate_image(image_prompt_text)
+                self.ui_manager.hide_image_loading_indicator()
+
+                if image_url:
+                    scene_data['background_image_url'] = image_url
+                    self.ui_manager.display_message(f"GameController: Image generated for scene '{scene_data.get('scene_id', scene_id)}'. URL: {image_url}", "info")
+                else:
+                    scene_data['background_image_url'] = None
+                    self.ui_manager.display_message(f"GameController: Failed to generate image for scene '{scene_data.get('scene_id', scene_id)}'.", "warning")
+                # --- End Image Generation ---
+
                 self.gwhr.update_state({'current_scene_data': scene_data}) # This also logs to scene_history
                 self.ui_manager.display_scene(scene_data)
                 self.current_game_state = "AWAITING_PLAYER_ACTION"
@@ -211,10 +229,27 @@ class GameController:
                 response_data = json.loads(response_json_str)
                 new_scene_id = response_data.get('scene_id')
 
+
+                # --- Image Generation for action outcome scene data ---
+                narrative_for_prompt_action = response_data.get('narrative', '')
+                npcs_for_prompt_action = ", ".join([npc.get('name', 'N/A') for npc in response_data.get('npcs_in_scene', []) if npc.get('name')])
+                image_prompt_text_action = f"Scene after action: {narrative_for_prompt_action[:150]}. NPCs: {npcs_for_prompt_action[:100]}."
+                response_data['image_prompt_elements'] = [image_prompt_text_action]
+
+                self.ui_manager.show_image_loading_indicator()
+                image_url_action = self.llm_interface.generate_image(image_prompt_text_action)
+                self.ui_manager.hide_image_loading_indicator()
+
+                if image_url_action:
+                    response_data['background_image_url'] = image_url_action
+                    self.ui_manager.display_message(f"GameController: Image updated/generated for scene '{response_data.get('scene_id')}'. URL: {image_url_action}", "info")
+                else:
+                    response_data['background_image_url'] = None
+                    self.ui_manager.display_message(f"GameController: Failed to update/generate image for scene '{response_data.get('scene_id')}'.", "warning")
+                # --- End Image Generation for action outcome ---
+
                 if new_scene_id and new_scene_id != current_scene_id_from_gwhr: # LLM decided to change scene
                     self.ui_manager.display_message(f"GameController: Transitioning to new scene: {new_scene_id}", "info")
-                    # self.initiate_scene(new_scene_id) # This would re-prompt LLM for the same scene.
-                    # Instead, directly use the data LLM provided for the new scene.
                     self.gwhr.update_state({'current_scene_data': response_data})
                     self.ui_manager.display_scene(response_data)
                 elif new_scene_id == current_scene_id_from_gwhr and response_data.get('narrative'): # Update to current scene (full refresh)
@@ -222,10 +257,13 @@ class GameController:
                     self.gwhr.update_state({'current_scene_data': response_data})
                     self.ui_manager.display_scene(response_data) # Display the updated scene
                 elif response_data.get('narrative_update'): # A specific narrative update for current scene
+                    # This path might need more fleshing out if LLM is expected to send *only* narrative_update
+                    # and not a full scene. The image logic above assumes response_data is the new full scene data.
+                    # If it's just a delta, image wouldn't typically change unless also in delta.
                     self.ui_manager.display_narrative(response_data.get('narrative_update',''))
-                    # Potentially merge other small changes from response_data into current_scene_data here
-                    # For now, just displaying the narrative update. A more complex merge might be needed.
-                    # Example: self.gwhr.update_state({'current_scene_data': {'some_flag': True}}) # if LLM sends deltas
+                    # If only narrative_update, current_scene_data in GWHR is not updated with response_data here.
+                    # This means the image displayed would be the old one. This might be desired.
+                    # For now, we assume LLM sends full scene data if image is to change.
                 else: # Fallback or unrecognized partial update
                     self.ui_manager.display_message("GameController: Action resulted in a minor or unclear update. Re-displaying current scene context.", "info")
                     self.ui_manager.display_scene(self.gwhr.get_data_store().get('current_scene_data', {}))
