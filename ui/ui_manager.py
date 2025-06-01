@@ -202,6 +202,25 @@ class UIManager:
             self.display_message("Invalid option, please try again.", "error") # Uses existing method
             return 'show_menu_again'
 
+    def display_npc_dialogue(self, npc_name: str, dialogue_text: str, player_options: list = None):
+        print(f"\n--- Dialogue: {npc_name} ---")
+        print(f"{npc_name}: \"{dialogue_text}\"")
+
+        if player_options and isinstance(player_options, list):
+            print("\nYour reply options:")
+            for i, option in enumerate(player_options):
+                if isinstance(option, dict):
+                    display_text = option.get('name', option.get('text', option.get('id', 'Unknown option')))
+                    print(f"  {i+1}. {display_text}")
+                else:
+                    print(f"  {i+1}. (Malformed option: {option})") # Should not happen with good data
+        # If no options, or not a list, just prints NPC dialogue. GameController would then decide what to do.
+        # (e.g., proceed, or call get_free_text_input if that's the flow)
+
+    def get_free_text_input(self, prompt_message: str) -> str:
+        user_input = input(f"\n{prompt_message} ").strip()
+        return user_input
+
     def display_narrative(self, text: str):
         print("\n" + "-"*10 + " NARRATIVE UPDATE " + "-"*10 + "\n")
         print(text)

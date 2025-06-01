@@ -20,7 +20,8 @@ class GWHR: # GameWorldHistoryRecorder
             'scene_history': [],
             'event_log': [],
             'current_scene_data': {},
-            'player_state': copy.deepcopy(default_player_state) # Initialize with default player state
+            'player_state': copy.deepcopy(default_player_state), # Initialize with default player state
+            'npcs': {} # Initialize NPC data store
         }
 
     def initialize(self, initial_world_data: dict):
@@ -41,16 +42,49 @@ class GWHR: # GameWorldHistoryRecorder
 
         # Ensure other GWHR specific keys (not player_state which is handled above)
         # have their defaults from __init__ if not provided by initial_world_data
-        # (though .update() would have added them if they were in processed_initial_data)
-        # This setdefault logic is more about ensuring they exist if initial_world_data was minimal.
-        # Given __init__ now sets them, this is more of a safeguard or for clarity.
+        # This setdefault logic ensures they exist if initial_world_data was minimal.
         self.data_store.setdefault('current_game_time', 0)
         self.data_store.setdefault('scene_history', [])
         self.data_store.setdefault('event_log', [])
         self.data_store.setdefault('current_scene_data', {})
+        # 'npcs' is initialized in __init__ and potentially populated below.
+        # 'player_state' is handled above.
+
+        # Process main_characters from WCD into the new NPC structure
+        if 'main_characters' in initial_world_data and isinstance(initial_world_data['main_characters'], list):
+            processed_npcs = {}
+            for char_data in initial_world_data['main_characters']: # char_data is from WCD
+                npc_id = char_data.get('id', char_data.get('name', '').lower().replace(' ', '_'))
+                if not npc_id:
+                    print(f"GWHR Warning: Skipping character due to missing id/name: {char_data}")
+                    continue
+
+                processed_npcs[npc_id] = {
+                    'id': npc_id,
+                    'name': char_data.get('name', 'Unknown NPC'),
+                    'description': char_data.get('description', ''), # From WCD
+                    'role': char_data.get('role', 'character'),       # From WCD
+                    # New detailed fields with defaults if not in char_data (which they won't be from current WCD)
+                    'attributes': char_data.get('attributes', {"mood": "neutral", "disposition_towards_player": 0}),
+                    'skills': char_data.get('skills', []),
+                    'knowledge': char_data.get('knowledge', []), # Topics NPC knows about
+                    'current_hp': char_data.get('current_hp', 100),
+                    'max_hp': char_data.get('max_hp', 100),
+                    'status_effects': char_data.get('status_effects', []), # e.g., ["poisoned", "blessed"]
+                    'current_location_id': char_data.get('current_location_id', None),
+                    'personality_traits': char_data.get('personality_traits', []),
+                    'motivations': char_data.get('motivations', []),
+                    'faction': char_data.get('faction', None),
+                    'dialogue_log': [], # Initialize empty dialogue log for each NPC
+                    'last_interaction_time': 0 # Game time of last significant interaction
+                }
+            self.data_store['npcs'] = processed_npcs # Replace default {} with processed NPCs
+        elif 'npcs' not in self.data_store: # Ensure 'npcs' key exists if not in WCD and somehow missed in __init__
+             self.data_store['npcs'] = {}
 
         print(f"GWHR: Initialized/Merged with world data. World Title: '{self.data_store.get('world_title', 'N/A')}'")
         print(f"GWHR: Player state attributes: {self.data_store.get('player_state', {}).get('attributes')}")
+        print(f"GWHR: NPC data processed. Found {len(self.data_store.get('npcs', {}))} NPCs.")
 
     def log_event(self, event_description: str, event_type: str = "general", causal_factors: list = None):
         event_log = self.data_store.setdefault('event_log', [])

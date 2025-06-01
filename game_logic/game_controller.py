@@ -7,7 +7,8 @@ from ui.ui_manager import UIManager
 from engine.model_selector import ModelSelector
 from engine.adventure_setup import AdventureSetup
 from engine.gwhr import GWHR
-from api.llm_interface import LLMInterface # Ensure LLMInterface is available for GameController to use directly or via other components
+from api.llm_interface import LLMInterface
+import copy # For deepcopying NPC data for dialogue session
 
 # GameEngine will be imported here later when needed
 
@@ -99,6 +100,300 @@ class GameController:
             # adventure_setup.generate_initial_world() would have already printed detailed error
             self.ui_manager.display_message("GameController: Failed to generate or parse World Conception Document. GWHR not initialized.", "error")
             return False
+
+    def handle_npc_dialogue(self, npc_id: str, initial_player_input: str = None):
+        original_game_state = self.current_game_state
+        self.current_game_state = "NPC_DIALOGUE"
+        self.ui_manager.display_message(f"\nStarting dialogue with NPC ID: {npc_id}...", "info")
+
+        all_npcs_data = self.gwhr.get_data_store().get('npcs', {})
+        npc_data_snapshot = copy.deepcopy(all_npcs_data.get(npc_id))
+
+        if not npc_data_snapshot:
+            self.ui_manager.display_message(f"Error: NPC with ID '{npc_id}' not found in GWHR.", "error")
+            self.current_game_state = original_game_state
+            return
+
+        npc_name = npc_data_snapshot.get('name', npc_id)
+        player_input_for_llm = initial_player_input if initial_player_input is not None else "..."
+
+        while self.current_game_state == "NPC_DIALOGUE":
+            gwhr_snapshot = self.gwhr.get_current_context()
+
+            npc_specific_context = {
+                "id": npc_data_snapshot.get('id'), "name": npc_name,
+                "description": npc_data_snapshot.get('description', '')[:100] + "...",
+                "role": npc_data_snapshot.get('role'),
+                "attributes": npc_data_snapshot.get('attributes'),
+                "status": npc_data_snapshot.get('status'),
+                "knowledge_preview": [k.get('topic_id', k) for k in npc_data_snapshot.get('knowledge', [])[:3]],
+                "dialogue_log_with_player_preview": npc_data_snapshot.get('dialogue_log', [])[-2:]
+            }
+
+            prompt_context_for_llm = {
+                "player_state_summary": {
+                    "attributes": gwhr_snapshot.get('player_state',{}).get('attributes'),
+                    "current_location_id": gwhr_snapshot.get('player_state',{}).get('current_location_id')
+                },
+                "current_scene_summary": {
+                    "scene_id": gwhr_snapshot.get('current_scene_data',{}).get('scene_id'),
+                    "narrative_snippet": gwhr_snapshot.get('current_scene_data',{}).get('narrative', '')[:100] + "..."
+                },
+                "game_time": gwhr_snapshot.get('current_game_time')
+            }
+
+            llm_prompt = (
+                f"You are roleplaying as {npc_name} (ID: {npc_id}).\n"
+                f"Your Character Details (NPC): {json.dumps(npc_specific_context, indent=2)}\n"
+                f"Overall Game Context: {json.dumps(prompt_context_for_llm, indent=2)}\n"
+                f"Player says/does to you: '{player_input_for_llm}'\n\n"
+                f"Task: Generate {npc_name}'s dialogue response. Your response must be a single valid JSON object including fields: "
+                f"'dialogue_text' (string, what you, {npc_name}, say), "
+                f"'new_npc_status' (string, your updated short-term status, e.g., 'intrigued', 'annoyed', 'helpful'), "
+                f"'attitude_towards_player_change' (string, e.g., '+5', '-2', or '0', reflecting change in your disposition), "
+                f"'knowledge_revealed' (list of new knowledge topic objects with 'topic_id' and 'summary' if you reveal something new), "
+                f"and optional 'dialogue_options_for_player' (list of 2-4 objects with 'id' and 'name' for player choices to continue talking to you). "
+                f"If the player says '/bye' or '/end', or if the conversation naturally concludes, make 'dialogue_text' a polite closing and set 'new_npc_status' to 'ending_dialogue'."
+            )
+
+            model_id = self.model_selector.get_selected_model()
+            if not model_id:
+                self.ui_manager.display_message("GameController: CRITICAL Error - No model selected for LLM call in dialogue.", "error")
+                self.current_game_state = "GAME_OVER"
+                break
+
+            response_json_str = self.llm_interface.generate(llm_prompt, model_id, expected_response_type='npc_dialogue_response')
+
+            if not response_json_str:
+                self.ui_manager.display_message(f"Error: {npc_name} seems lost for words (LLM failed to respond). Try again or type '/bye'.", "error")
+                player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
+                if player_input_for_llm.lower() in ["/bye", "/end"]:
+                    self.current_game_state = original_game_state
+                continue
+
+            try:
+                dialogue_data = json.loads(response_json_str)
+            except json.JSONDecodeError as e:
+                self.ui_manager.display_message(f"Error: Received garbled response from {npc_name} (JSON Error: {e}). Snippet: {response_json_str[:100]}...", "error")
+                player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
+                if player_input_for_llm.lower() in ["/bye", "/end"]:
+                    self.current_game_state = original_game_state
+                continue
+
+            npc_actual_response_text = dialogue_data.get('dialogue_text', f"({npc_name} seems unresponsive.)")
+            player_reply_options = dialogue_data.get('dialogue_options_for_player')
+
+            self.ui_manager.display_npc_dialogue(npc_name, npc_actual_response_text, player_reply_options)
+
+            npc_data_snapshot['status'] = dialogue_data.get('new_npc_status', npc_data_snapshot.get('status'))
+            dialogue_log_entry = {'player': player_input_for_llm, 'npc': npc_actual_response_text, 'time': self.gwhr.data_store.get('current_game_time')}
+            npc_data_snapshot.setdefault('dialogue_log', []).append(dialogue_log_entry)
+            npc_data_snapshot['last_interaction_time'] = self.gwhr.data_store.get('current_game_time')
+
+            attitude_change_str = dialogue_data.get('attitude_towards_player_change', '0')
+            try:
+                attitude_change = int(attitude_change_str)
+                npc_data_snapshot.setdefault('attributes', {}).setdefault('disposition_towards_player', 0)
+                npc_data_snapshot['attributes']['disposition_towards_player'] += attitude_change
+            except ValueError:
+                self.ui_manager.display_message(f"Warning: Invalid attitude_towards_player_change format: {attitude_change_str}", "warning")
+
+            current_npcs_in_gwhr = self.gwhr.get_data_store().get('npcs', {})
+            current_npcs_in_gwhr[npc_id] = npc_data_snapshot
+            self.gwhr.update_state({'npcs': current_npcs_in_gwhr})
+
+            self.gwhr.log_event(
+                f"Dialogue: Player: '{player_input_for_llm}', {npc_name}: '{npc_actual_response_text[:50]}...'. Attitude change: {attitude_change_str}.",
+                event_type="dialogue_exchange",
+                causal_factors=[f"npc:{npc_id}"]
+            )
+
+            if npc_data_snapshot.get('status') == 'ending_dialogue':
+                self.current_game_state = original_game_state
+                break
+
+            if player_reply_options:
+                self.ui_manager.display_message("You can choose an option or type your own reply (or /bye to end).", "info")
+                raw_next_input = self.ui_manager.get_free_text_input(f"Your response to {npc_name}: ")
+
+                processed_choice = False
+                try:
+                    choice_num = int(raw_next_input)
+                    if 1 <= choice_num <= len(player_reply_options):
+                        selected_option = player_reply_options[choice_num-1]
+                        player_input_for_llm = selected_option.get('name', selected_option.get('id'))
+                        self.gwhr.log_event(f"Player selected dialogue option: '{player_input_for_llm}' (ID: {selected_option.get('id')})", event_type="player_dialogue_choice")
+                        processed_choice = True
+                except ValueError:
+                    pass
+
+                if not processed_choice:
+                    player_input_for_llm = raw_next_input
+            else:
+                player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
+
+            if player_input_for_llm.lower() in ["/bye", "/end"]:
+                self.current_game_state = original_game_state
+
+        self.ui_manager.display_message(f"\nDialogue with {npc_name} ended.", "info")
+        if self.current_game_state == "NPC_DIALOGUE":
+            self.current_game_state = original_game_state
+
+    def handle_npc_dialogue(self, npc_id: str, initial_player_input: str = None):
+        original_game_state = self.current_game_state
+        self.current_game_state = "NPC_DIALOGUE"
+        self.ui_manager.display_message(f"\nStarting dialogue with NPC ID: {npc_id}...", "info")
+
+        # Ensure GWHR.data_store['npcs'] exists and npc_id is in it.
+        # GWHR.get_data_store() returns a deepcopy, so we need to fetch, modify, and then save back.
+        # For a long dialogue, repeatedly deepcopying the entire GWHR store is inefficient.
+        # A better approach for frequent updates to a specific NPC might be a more direct access or specific GWHR methods.
+        # For now, we'll work with copies and full updates as per current GWHR design for player_state.
+
+        all_npcs_data = self.gwhr.get_data_store().get('npcs', {})
+        npc_data_snapshot = copy.deepcopy(all_npcs_data.get(npc_id)) # Get a mutable copy for this dialogue session
+
+        if not npc_data_snapshot:
+            self.ui_manager.display_message(f"Error: NPC with ID '{npc_id}' not found in GWHR.", "error")
+            self.current_game_state = original_game_state # Revert
+            return
+
+        npc_name = npc_data_snapshot.get('name', npc_id)
+        player_input_for_llm = initial_player_input if initial_player_input is not None else "..." # Default if no initial input
+
+        while self.current_game_state == "NPC_DIALOGUE":
+            gwhr_snapshot = self.gwhr.get_current_context() # Get full context for prompt
+
+            # Construct NPC-specific context for the prompt (limited fields)
+            npc_specific_context = {
+                "id": npc_data_snapshot.get('id'), "name": npc_name,
+                "description": npc_data_snapshot.get('description', '')[:100] + "...", # Snippet
+                "role": npc_data_snapshot.get('role'),
+                "attributes": npc_data_snapshot.get('attributes'),
+                "status": npc_data_snapshot.get('status'), # Current short-term status
+                "knowledge_preview": [k.get('topic_id', k) for k in npc_data_snapshot.get('knowledge', [])[:3]], # Show only a few topic IDs
+                "dialogue_log_with_player_preview": npc_data_snapshot.get('dialogue_log', [])[-2:] # Last 2 exchanges
+            }
+
+            prompt_context_for_llm = {
+                "player_state_summary": {
+                    "attributes": gwhr_snapshot.get('player_state',{}).get('attributes'),
+                    "current_location_id": gwhr_snapshot.get('player_state',{}).get('current_location_id')
+                },
+                "current_scene_summary": {
+                    "scene_id": gwhr_snapshot.get('current_scene_data',{}).get('scene_id'),
+                    "narrative_snippet": gwhr_snapshot.get('current_scene_data',{}).get('narrative', '')[:100] + "..."
+                },
+                "game_time": gwhr_snapshot.get('current_game_time')
+            }
+
+            llm_prompt = (
+                f"You are roleplaying as {npc_name} (ID: {npc_id}).\n"
+                f"Your Character Details (NPC): {json.dumps(npc_specific_context, indent=2)}\n"
+                f"Overall Game Context: {json.dumps(prompt_context_for_llm, indent=2)}\n"
+                f"Player says/does to you: '{player_input_for_llm}'\n\n"
+                f"Task: Generate {npc_name}'s dialogue response. Your response must be a single valid JSON object including fields: "
+                f"'dialogue_text' (string, what you, {npc_name}, say), "
+                f"'new_npc_status' (string, your updated short-term status, e.g., 'intrigued', 'annoyed', 'helpful'), "
+                f"'attitude_towards_player_change' (string, e.g., '+5', '-2', or '0', reflecting change in your disposition), "
+                f"'knowledge_revealed' (list of new knowledge topic objects with 'topic_id' and 'summary' if you reveal something new), "
+                f"and optional 'dialogue_options_for_player' (list of 2-4 objects with 'id' and 'name' for player choices to continue talking to you). "
+                f"If the player says '/bye' or '/end', or if the conversation naturally concludes, make 'dialogue_text' a polite closing and set 'new_npc_status' to 'ending_dialogue'."
+            )
+
+            model_id = self.model_selector.get_selected_model()
+            if not model_id:
+                self.ui_manager.display_message("GameController: CRITICAL Error - No model selected for LLM call in dialogue.", "error")
+                self.current_game_state = "GAME_OVER"
+                break
+
+            response_json_str = self.llm_interface.generate(llm_prompt, model_id, expected_response_type='npc_dialogue_response')
+
+            if not response_json_str:
+                self.ui_manager.display_message(f"Error: {npc_name} seems lost for words (LLM failed to respond). Try again or type '/bye'.", "error")
+                # Get new player input to decide next step
+                player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
+                if player_input_for_llm.lower() in ["/bye", "/end"]:
+                    self.current_game_state = original_game_state # Revert to pre-dialogue state
+                # Loop continues with new player_input_for_llm or exits if state changed
+                continue
+
+            try:
+                dialogue_data = json.loads(response_json_str)
+            except json.JSONDecodeError as e:
+                self.ui_manager.display_message(f"Error: Received garbled response from {npc_name} (JSON Error: {e}). Snippet: {response_json_str[:100]}...", "error")
+                player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
+                if player_input_for_llm.lower() in ["/bye", "/end"]:
+                    self.current_game_state = original_game_state
+                continue
+
+            npc_actual_response_text = dialogue_data.get('dialogue_text', f"({npc_name} seems unresponsive.)")
+            player_reply_options = dialogue_data.get('dialogue_options_for_player')
+
+            self.ui_manager.display_npc_dialogue(npc_name, npc_actual_response_text, player_reply_options)
+
+            # Update NPC state within our npc_data_snapshot for this session
+            npc_data_snapshot['status'] = dialogue_data.get('new_npc_status', npc_data_snapshot.get('status'))
+            dialogue_log_entry = {'player': player_input_for_llm, 'npc': npc_actual_response_text, 'time': self.gwhr.data_store.get('current_game_time')}
+            npc_data_snapshot.setdefault('dialogue_log', []).append(dialogue_log_entry)
+            npc_data_snapshot['last_interaction_time'] = self.gwhr.data_store.get('current_game_time')
+
+            attitude_change_str = dialogue_data.get('attitude_towards_player_change', '0')
+            try:
+                attitude_change = int(attitude_change_str) # Handles "+5", "-2", "0"
+                npc_data_snapshot.setdefault('attributes', {}).setdefault('disposition_towards_player', 0)
+                npc_data_snapshot['attributes']['disposition_towards_player'] += attitude_change
+            except ValueError:
+                self.ui_manager.display_message(f"Warning: Invalid attitude_towards_player_change format: {attitude_change_str}", "warning")
+
+            # TODO: Process 'knowledge_revealed' and update NPC/world knowledge in GWHR
+
+            # Persist the updated npc_data_snapshot back to GWHR's main NPC store
+            # This requires GWHR.update_state to handle nested updates to its 'npcs' dict correctly
+            # or a new GWHR method like update_npc_data(npc_id, npc_data_snapshot)
+            current_npcs_in_gwhr = self.gwhr.get_data_store().get('npcs', {})
+            current_npcs_in_gwhr[npc_id] = npc_data_snapshot # Update the specific NPC
+            self.gwhr.update_state({'npcs': current_npcs_in_gwhr}) # This will deepcopy the entire npcs dict again.
+                                                              # More efficient would be a targeted update.
+
+            self.gwhr.log_event(
+                f"Dialogue: Player: '{player_input_for_llm}', {npc_name}: '{npc_actual_response_text[:50]}...'. Attitude change: {attitude_change_str}.",
+                event_type="dialogue_exchange",
+                causal_factors=[f"npc:{npc_id}"]
+            )
+
+            if npc_data_snapshot.get('status') == 'ending_dialogue':
+                self.current_game_state = original_game_state
+                break
+
+            if player_reply_options:
+                self.ui_manager.display_message("You can choose an option or type your own reply (or /bye to end).", "info")
+                raw_next_input = self.ui_manager.get_free_text_input(f"Your response to {npc_name}: ")
+
+                processed_choice = False
+                try: # Try to process as a number first
+                    choice_num = int(raw_next_input)
+                    if 1 <= choice_num <= len(player_reply_options):
+                        selected_option = player_reply_options[choice_num-1]
+                        player_input_for_llm = selected_option.get('name', selected_option.get('id'))
+                        # Here, we might want to send the ID or a specific command related to the ID to LLM
+                        # For now, sending the display name as the next input.
+                        self.gwhr.log_event(f"Player selected dialogue option: '{player_input_for_llm}' (ID: {selected_option.get('id')})", event_type="player_dialogue_choice")
+                        processed_choice = True
+                except ValueError:
+                    pass # Not a number, treat as free text
+
+                if not processed_choice:
+                    player_input_for_llm = raw_next_input # Use the raw text
+            else:
+                player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
+
+            if player_input_for_llm.lower() in ["/bye", "/end"]:
+                self.current_game_state = original_game_state # Exit dialogue
+
+        self.ui_manager.display_message(f"\nDialogue with {npc_name} ended.", "info")
+        if self.current_game_state == "NPC_DIALOGUE": # If loop exited for reasons other than /bye or status='ending_dialogue'
+            self.current_game_state = original_game_state
 
     def advance_time(self, duration: int = 1):
         current_time = self.gwhr.data_store.get('current_game_time', 0)
@@ -226,6 +521,23 @@ class GameController:
 
         self.advance_time(1) # Advance game time by 1 unit
 
+        # Check if this action is a dialogue trigger
+        current_scene_data_for_action = self.gwhr.get_data_store().get('current_scene_data', {})
+        interactive_elements_for_action = current_scene_data_for_action.get('interactive_elements', [])
+        chosen_element = next((el for el in interactive_elements_for_action if el.get('id') == action_detail), None)
+
+        if chosen_element and chosen_element.get('type') == 'dialogue' and chosen_element.get('target_id'):
+            npc_id_to_talk_to = chosen_element['target_id']
+            # Use the name of the chosen element as the initial player input for context
+            initial_dialogue_input = f"Selected interaction: '{chosen_element.get('name', action_detail)}'"
+            self.handle_npc_dialogue(npc_id_to_talk_to, initial_player_input=initial_dialogue_input)
+            # handle_npc_dialogue will manage game state and UI from here, including setting AWAITING_PLAYER_ACTION
+            # or reverting to original_game_state before dialogue.
+            # We need to ensure the game loop correctly re-evaluates after dialogue.
+            # If handle_npc_dialogue sets state to AWAITING_PLAYER_ACTION, game_loop will re-display scene.
+            return # End process_player_action here for dialogue actions.
+
+        # If not a dialogue action, proceed with generic action processing:
         context_for_llm = self.gwhr.get_current_context()
         current_scene_id_from_gwhr = context_for_llm.get('current_scene_data', {}).get('scene_id', 'UNKNOWN_SCENE')
 

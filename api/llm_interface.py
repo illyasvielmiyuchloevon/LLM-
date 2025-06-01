@@ -61,14 +61,63 @@ class LLMInterface:
   "interactive_elements": [
     {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}},
     {{"id": "enter_dark_forest", "name": "Venture east into the ominous dark forest.", "type": "navigate"}},
-    {{"id": "approach_shimmering_lake", "name": "Walk west towards the beautiful shimmering lake.", "type": "navigate"}},
     {{"id": "inspect_signpost_detail", "name": "Examine the weathered signpost closely.", "type": "examine", "target_id": "signpost_object"}},
-    {{"id": "talk_to_old_man_willow", "name": "Attempt to wake Old Man Willow.", "type": "dialogue", "target_id": "old_man_willow_npc"}}
+    {{"id": "talk_to_old_man_willow", "name": "Talk to Old Man Willow.", "type": "dialogue", "target_id": "old_man_willow_npc"}},
+    {{"id": "interact_raven_dialogue", "name": "Try to communicate with the Mysterious Raven.", "type": "dialogue", "target_id": "mysterious_raven_npc"}}
   ],
   "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes."
 }}
 '''
             print("LLMInterface: Mock LLM call successful (scene_description as JSON string).")
+            return mock_json_string
+        elif expected_response_type == 'npc_dialogue_response':
+            npc_name_in_prompt = "Unknown NPC" # Default
+            # Attempt to extract NPC name from prompt (simple parsing)
+            if "NPC:" in prompt_str: # Use prompt_str which is guaranteed to be a string
+                try:
+                    # Assumes format like "Context... \nNPC: Actual Name\nPlayer says..."
+                    # or "NPC ID: actual_id" or "NPC Name: Actual Name"
+                    # This is a very basic extraction for mock purposes.
+                    # A more robust system would pass structured data about the target NPC.
+                    split_by_npc_tag = prompt_str.split("NPC:")
+                    if len(split_by_npc_tag) > 1:
+                         # Take the part after "NPC:", then take first line, strip spaces.
+                        npc_name_in_prompt = split_by_npc_tag[1].split("\n")[0].strip()
+                        # Further try to clean if it was "NPC ID: npc_id_val" to get "npc_id_val"
+                        if npc_name_in_prompt.startswith("ID:"):
+                            npc_name_in_prompt = npc_name_in_prompt.split("ID:")[1].strip()
+                        elif npc_name_in_prompt.startswith("Name:"):
+                             npc_name_in_prompt = npc_name_in_prompt.split("Name:")[1].strip()
+
+                except IndexError:
+                    pass # Keep default "Unknown NPC" if parsing fails
+
+            # Sanitize npc_name_in_prompt for use as an ID (if it's not already an ID)
+            # and also for embedding in f-string if it contains quotes.
+            npc_id_from_name = npc_name_in_prompt.lower().replace(' ', '_').replace("'", "").replace('"', "")
+            # Only need to escape double quotes for JSON validity if the snippet itself is part of a JSON string value.
+            # Newlines should be removed or replaced for single-line display.
+            dialogue_prompt_snippet = prompt_str[:30].replace("\n", " ").replace('"', '\\"')
+
+
+            mock_json_string = f'''
+{{
+  "npc_id": "{npc_id_from_name}",
+  "dialogue_text": "Well, hello there, traveler! You mentioned something about '{dialogue_prompt_snippet}'. What can I do for you, {npc_name_in_prompt}?",
+  "new_npc_status": "curious",
+  "attitude_towards_player_change": "+2",
+  "knowledge_revealed": [
+    {{"topic_id": "local_dangers", "summary": "Implied this area can be dangerous based on your query."}}
+  ],
+  "dialogue_options_for_player": [
+    {{"id": "ask_npc_name_{npc_id_from_name}", "name": "Actually, I wanted to ask your name."}},
+    {{"id": "ask_about_location_{npc_id_from_name}", "name": "Can you tell me more about this place?"}},
+    {{"id": "state_own_predicament_{npc_id_from_name}", "name": "I find myself in a bit of a bind..."}},
+    {{"id": "leave_dialogue_{npc_id_from_name}", "name": "Nothing for now, thank you. Farewell."}}
+  ]
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (npc_dialogue_response as JSON string).")
             return mock_json_string
         else:
             # Generic mock response for other types
