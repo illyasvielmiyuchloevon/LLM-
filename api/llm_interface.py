@@ -47,6 +47,27 @@ class LLMInterface:
 }}'''
             print("LLMInterface: Mock LLM call successful (world_conception_document as JSON string).")
             return mock_json_string
+        elif expected_response_type == 'scene_description':
+            prompt_snippet_for_scene_id = prompt_str[:70].replace("\n", " ").replace("'", "\\'").replace('"', '\\"') # Escape single and double quotes
+            mock_json_string = f'''
+{{
+  "scene_id": "mock_scene_for_prompt_start_'{prompt_snippet_for_scene_id}'",
+  "narrative": "You are standing at a crossroads. A weathered signpost points in three directions: north towards the mountains, east towards a dark forest, and west towards a shimmering lake. The air is still, and a sense of anticipation hangs heavy.",
+  "npcs_in_scene": [
+    {{"name": "Old Man Willow", "status": "seems to be asleep", "dialogue_hook": "Zzzzz..."}},
+    {{"name": "Mysterious Raven", "status": "observing you intently from a nearby branch", "dialogue_hook": "Caw! (It seems to suggest you choose wisely.)"}}
+  ],
+  "interactive_elements": [
+    {{"id": "go_north_mountains", "description": "Head north towards the towering mountains."}},
+    {{"id": "enter_dark_forest", "description": "Venture east into the ominous dark forest."}},
+    {{"id": "approach_shimmering_lake", "description": "Walk west towards the beautiful shimmering lake."}},
+    {{"id": "inspect_signpost", "description": "Examine the weathered signpost more closely."}}
+  ],
+  "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes."
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (scene_description as JSON string).")
+            return mock_json_string
         else:
             # Generic mock response for other types
             mock_response = f"Mock LLM Response for {expected_response_type} using prompt (first 20 chars: '{prompt_str[:20]}...')."
