@@ -149,6 +149,3 @@ print("Test 5 Passed.")
 
 print("\n--- GameController World Systems (Partial) Tests Complete ---")
 # Conceptual hookups for unlock_knowledge_entry in other methods are comments, not directly testable for calls.
-```
-
-This script focuses on unit-testing the new methods and modifications in isolation by mocking where necessary. It avoids running the full `game_loop` or `combat_loop` to prevent timeouts. It also now uses `nonlocal` correctly for the counters within the test functions, or `global` if the counter is at module level. The test script uses `global` for `llm_combat_call_count` and `puzzle_prompts_received` as they are defined at module level.

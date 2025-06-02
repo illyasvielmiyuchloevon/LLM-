@@ -67,7 +67,7 @@ class LLMInterface:
     {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}}
   ],
   "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes. You notice strange symbols on the north wall and a rusty lever near the east passage.",
-  "on_scene_load_knowledge": [ # New field for scene description
+  "on_scene_load_knowledge": [ 
     {{"topic_id": "crossroads_history", "summary": "This ancient crossroads seems to have been a significant meeting point for travelers of old, judging by the weathered signpost.", "source_type": "observation", "source_detail": "Crossroads Signpost examination"}}
   ]
 }}
