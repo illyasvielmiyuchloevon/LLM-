@@ -623,7 +623,7 @@ class GameController:
                     self.ui_manager.display_message(f"The event transitions to a new scene: {new_scene_id_from_event}", "info")
                     self.initiate_scene(new_scene_id_from_event) 
                 else:
-            pass # State handling as before
+                    pass # State handling as before
 
             except json.JSONDecodeError as e:
                 self.ui_manager.display_message(f"GameController: Error parsing dynamic event outcome from LLM: {e}", "error")
