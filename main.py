@@ -10,17 +10,17 @@ from engine.gwhr import GWHR # Import GWHR
 # UIManager is already imported once at the top
 
 if __name__ == "__main__":
-    ui_manager = UIManager()
+    ui_manager = UIManager() 
     api_key_manager = ApiKeyManager()
-    llm_interface = LLMInterface(api_key_manager)
+    llm_interface = LLMInterface(api_key_manager) 
     model_selector = ModelSelector(api_key_manager)
     # AdventureSetup now requires llm_interface and model_selector
-    adventure_setup = AdventureSetup(ui_manager, llm_interface, model_selector)
+    adventure_setup = AdventureSetup(ui_manager, llm_interface, model_selector) 
     gwhr = GWHR() # Instantiate GWHR
     game_engine = GameEngine()
-
+    
     game_controller = GameController(
-        api_key_manager=api_key_manager,
+        api_key_manager=api_key_manager, 
         ui_manager=ui_manager,
         model_selector=model_selector,
         adventure_setup=adventure_setup,
@@ -33,11 +33,11 @@ if __name__ == "__main__":
 
     if key_validated:
         ui_manager.display_message("Main: API Key validation successful.", "info")
-
+        
         model_selected = game_controller.select_model_flow()
         if model_selected:
             ui_manager.display_message("Main: Model selection successful.", "info")
-
+            
             adventure_pref_text = game_controller.request_adventure_preferences_flow()
             if adventure_pref_text:
                 ui_manager.display_message(f"Main: Adventure preference set. Proceeding to Detailed Blueprint generation.", "info")

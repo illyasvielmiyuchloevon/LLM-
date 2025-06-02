@@ -5,8 +5,8 @@ import json # For pretty printing dicts if needed
 print("--- Test GWHR New Data Structures Initialization ---")
 
 default_weather_expected = {
-    "condition": "clear",
-    "intensity": "mild",
+    "condition": "clear", 
+    "intensity": "mild", 
     "effects_description": "The sky is clear and the air is calm."
 }
 
@@ -28,7 +28,7 @@ print("Test 1 Passed.")
 
 # Test 2: initialize without these new keys in initial_world_data
 print("\n--- Test 2: initialize without new keys in input ---")
-gwhr_t2 = GWHR()
+gwhr_t2 = GWHR() 
 initial_data_minimal = {"world_title": "Minimal World"}
 gwhr_t2.initialize(initial_data_minimal) # This will print GWHR init messages
 store2 = gwhr_t2.get_data_store()
@@ -44,7 +44,7 @@ print("Test 2 Passed.")
 
 # Test 3: initialize WITH these new keys in initial_world_data
 print("\n--- Test 3: initialize WITH new keys in input ---")
-gwhr_t3 = GWHR()
+gwhr_t3 = GWHR() 
 custom_kc = {"lore_001": {"title": "Ancient Kings", "content": "..."}}
 custom_dwel = [{"event_id": "volcano_erupt", "timestamp": 10, "description": "Mount Doom rumbled."}]
 custom_weather = {"condition": "stormy", "intensity": "high", "effects_description": "A fierce storm rages!"}
@@ -54,7 +54,7 @@ initial_data_with_new_keys = {
     "dynamic_world_events_log": copy.deepcopy(custom_dwel),
     "world_state": {
         "current_weather": copy.deepcopy(custom_weather),
-        "other_world_state_var": "value"
+        "other_world_state_var": "value" 
     }
 }
 gwhr_t3.initialize(initial_data_with_new_keys)
@@ -74,7 +74,7 @@ print(f"Weather in Test 3: {store3.get('world_state', {}).get('current_weather')
 initial_data_with_new_keys['knowledge_codex']['lore_001']['title'] = "MODIFIED_KC"
 assert gwhr_t3.get_data_store()['knowledge_codex']['lore_001']['title'] == "Ancient Kings", \
     "knowledge_codex was not deep_copied by overall WCD deepcopy in initialize (or by get_data_store)"
-
+    
 initial_data_with_new_keys['world_state']['current_weather']['condition'] = "sunny_modified"
 assert gwhr_t3.get_data_store()['world_state']['current_weather']['condition'] == "stormy", \
     "world_state.current_weather was not deep_copied by overall WCD deepcopy in initialize (or by get_data_store)"
@@ -86,7 +86,7 @@ gwhr_t4 = GWHR()
 initial_data_ws_no_weather = {
     "world_title": "World State No Weather",
     "world_state": { # world_state exists
-        "some_other_global_flag": True
+        "some_other_global_flag": True 
         # but current_weather is missing from this input
     }
 }

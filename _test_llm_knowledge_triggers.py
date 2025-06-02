@@ -8,7 +8,7 @@ print("--- Test LLMInterface Knowledge Triggers in Mocks ---")
 akm = ApiKeyManager()
 akm.store_api_key("fake-api-key-for-knowledge-triggers-test")
 llm_interface = LLMInterface(api_key_manager=akm)
-model_for_test = "gemini-pro-mock"
+model_for_test = "gemini-pro-mock" 
 
 # --- Test 1: 'scene_description' for 'on_scene_load_knowledge' ---
 print("\n--- Test 1: 'scene_description' for 'on_scene_load_knowledge' ---")

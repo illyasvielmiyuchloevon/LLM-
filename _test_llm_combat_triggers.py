@@ -27,7 +27,7 @@ for element in interactive_elements:
         assert element.get('target_id') == 'mysterious_raven_npc', "Raven target_id mismatch"
         assert element.get('name') == 'Challenge the Mysterious Raven!', "Raven name mismatch"
         combat_trigger_found_and_verified = True
-        break
+        break 
 assert combat_trigger_found_and_verified, "Combat trigger 'challenge_raven_combat' not found or incorrect."
 print("Combat trigger 'challenge_raven_combat' verified successfully.")
 

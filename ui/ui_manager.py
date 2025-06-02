@@ -22,13 +22,13 @@ class UIManager:
 
         for i, model_name in enumerate(models):
             print(f"  {i+1}: {model_name}")
-
+        
         choice = input("UI: Select a model by number (or press Enter to skip): ")
 
         if not choice:
             print("UI: No model selected.")
             return None
-
+        
         try:
             choice_num = int(choice)
             if 1 <= choice_num <= len(models):
@@ -62,7 +62,7 @@ class UIManager:
 
         # --- Textual Content Part ---
         print("--- SCENE DETAILS ---\n")
-
+        
         narrative = scene_data.get('narrative', 'No narrative provided for this scene.')
         print(f"Narrative: {narrative}") # Added "Narrative: " prefix for clarity
 
@@ -86,7 +86,7 @@ class UIManager:
         else:
             # Print("\n--- ACTIONS ---") # Replaced by display_interaction_menu's handling or a generic message
             print("No specific actions seem possible right now.") # Fallback if no elements
-
+        
         self.show_game_systems_menu_button() # Called at the end of scene display
         print("\n" + "="*20 + " SCENE END " + "="*20 + "\n")
 
@@ -95,7 +95,7 @@ class UIManager:
         if not interactive_elements or not isinstance(interactive_elements, list):
             print("No specific interactions currently available.")
             return
-
+        
         for i, element in enumerate(interactive_elements):
             # Use 'name' for display, fallback to 'id', then to a generic message
             display_name = element.get('name', element.get('id', 'Unknown Interaction'))
@@ -106,7 +106,7 @@ class UIManager:
 
     def display_character_status_screen(self, player_data: dict):
         print("\n" + "="*15 + " CHARACTER STATUS " + "="*15 + "\n")
-
+        
         attributes = player_data.get('attributes', {})
         print("--- Attributes ---")
         print(f"  Strength:     {attributes.get('strength', 'N/A')}")
@@ -115,15 +115,15 @@ class UIManager:
         print(f"  Sanity:       {attributes.get('sanity', 'N/A')}")
         print(f"  Willpower:    {attributes.get('willpower', 'N/A')}")
         print(f"  Insight:      {attributes.get('insight', 'N/A')}")
-
+        
         skills = player_data.get('skills', [])
         print("\n--- Skills ---")
-        if not skills:
+        if not skills: 
             print("  (No skills learned yet)")
         else:
-            for skill in skills:
+            for skill in skills: 
                 print(f"  - {skill.get('name', 'Unknown Skill')} (Lvl: {skill.get('level', 1)})")
-
+        
         equipment = player_data.get('equipment_slots', {})
         inventory = player_data.get('inventory', []) # Needed to resolve item names
         print("\n--- Equipment ---")
@@ -141,26 +141,26 @@ class UIManager:
                     else: # If it's an object already (not planned yet but for robustness) or ID not found
                         item_name = str(item_id_or_obj) if not isinstance(item_id_or_obj, dict) else item_id_or_obj.get('name', 'Unknown Equipped Item')
                 print(f"  {slot.capitalize()}: {item_name}")
-
+                
         print(f"\nLocation: {player_data.get('current_location_id', 'Unknown')}")
         print("\n" + "="*48)
         input("--- Press Enter to close ---")
 
     def display_inventory_screen(self, inventory_list: list):
         print("\n" + "="*15 + " INVENTORY " + "="*15 + "\n")
-        if not inventory_list:
+        if not inventory_list: 
             print("  (Inventory is empty)")
         else:
-            for item in inventory_list:
+            for item in inventory_list: 
                 print(f"  - {item.get('name', 'Unknown Item')} (Qty: {item.get('quantity', 1)})")
-                if item.get('description'):
+                if item.get('description'): 
                     print(f"    '{item.get('description')}'")
         print("\n" + "="*39)
         input("--- Press Enter to close ---")
 
     def display_equipment_screen(self, equipment_slots: dict, inventory_list: list):
         print("\n" + "="*15 + " EQUIPMENT " + "="*15 + "\n")
-        if not equipment_slots:
+        if not equipment_slots: 
             print("  (No equipment slots defined)")
         else:
             for slot, item_id_or_obj in equipment_slots.items():
@@ -190,16 +190,16 @@ class UIManager:
         if not codex_entries or not isinstance(codex_entries, dict) or not codex_entries:
             print("  (No knowledge entries discovered yet.)")
             # Wait for input before returning to prevent instant loop if called from menu
-            input("--- Press Enter to return to menu ---")
+            input("--- Press Enter to return to menu ---") 
             return ('show_codex_again', None) # Or 'close_menu' depending on desired flow
 
-        entries_list = list(codex_entries.values())
+        entries_list = list(codex_entries.values()) 
         for i, entry in enumerate(entries_list):
             print(f"  {i+1}. {entry.get('title', 'Untitled Entry')}")
         print("  0. Exit Codex")
-
+        
         choice_str = input("\nSelect an entry to read (number) or 0 to exit: ").strip()
-
+        
         try:
             choice_num = int(choice_str)
             if choice_num == 0:
@@ -207,9 +207,9 @@ class UIManager:
             elif 1 <= choice_num <= len(entries_list):
                 selected_entry = entries_list[choice_num - 1]
                 self.display_codex_entry_content(
-                    selected_entry.get('title','N/A'),
-                    selected_entry.get('content','N/A'),
-                    selected_entry.get('source_type','N/A'),
+                    selected_entry.get('title','N/A'), 
+                    selected_entry.get('content','N/A'), 
+                    selected_entry.get('source_type','N/A'), 
                     selected_entry.get('source_detail','N/A')
                 )
                 return ('viewed_entry', selected_entry.get('knowledge_id'))
@@ -230,7 +230,7 @@ class UIManager:
         print("  3. Equipment")
         print("  4. Knowledge Codex") # New Option
         print("  0. Close Menu")
-
+        
         choice = input("Select an option: ").strip()
 
         if choice == '1':
@@ -242,7 +242,7 @@ class UIManager:
             return 'show_menu_again'
         elif choice == '3':
             equipment_slots = player_state_data.get('equipment_slots', {})
-            inventory = player_state_data.get('inventory', [])
+            inventory = player_state_data.get('inventory', []) 
             self.display_equipment_screen(equipment_slots, inventory)
             return 'show_menu_again'
         elif choice == '4': # New case for Codex
@@ -268,8 +268,8 @@ class UIManager:
         elif choice == '0':
             return 'close_menu'
         else:
-            self.display_message("Invalid option, please try again.", "error")
-            return 'show_menu_again'
+            self.display_message("Invalid option, please try again.", "error") 
+            return 'show_menu_again' 
 
     def display_npc_dialogue(self, npc_name: str, dialogue_text: str, player_options: list = None):
         print(f"\n--- Dialogue: {npc_name} ---")
@@ -311,9 +311,9 @@ class UIManager:
     def present_combat_strategies(self, strategies: list) -> str | None:
         print("\n--- Choose Your Strategy ---")
         if not strategies or not isinstance(strategies, list): # Added type check for robustness
-            print("No specific strategies available.")
-            return None
-
+            print("No specific strategies available.") 
+            return None 
+    
         # display_interaction_menu might be too specific with its "INTERACTION MENU" header.
         # Re-implementing the list display here for "Choose Your Strategy" context.
         for i, strategy in enumerate(strategies):
@@ -350,9 +350,9 @@ class UIManager:
         if not choices:
             print("No choices available to select from.")
             return None
-
+        
         prompt_message = "Choose an action by number (1-{}): ".format(len(choices))
-
+        
         while True:
             action_input = input(prompt_message).strip()
             try:
@@ -364,7 +364,7 @@ class UIManager:
                     else:
                         # This case should ideally not happen if choices are well-formed
                         print("Error: Choice format incorrect. No ID found.")
-                        return None
+                        return None 
                 else:
                     print(f"Invalid choice. Please enter a number between 1 and {len(choices)}.")
             except ValueError:

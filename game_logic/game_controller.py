@@ -6,29 +6,29 @@ import time # For game loop delay
 # from ui.ui_manager import UIManager # Redundant
 from engine.model_selector import ModelSelector
 from engine.adventure_setup import AdventureSetup
-from engine.gwhr import GWHR
-from api.llm_interface import LLMInterface
+from engine.gwhr import GWHR 
+from api.llm_interface import LLMInterface 
 import copy # For deepcopying NPC data for dialogue session
 
 # GameEngine will be imported here later when needed
 
 class GameController:
-    def __init__(self, api_key_manager: ApiKeyManager, ui_manager: UIManager,
-                 model_selector: ModelSelector, adventure_setup: AdventureSetup,
-                 gwhr: GWHR, llm_interface: LLMInterface):
+    def __init__(self, api_key_manager: ApiKeyManager, ui_manager: UIManager, 
+                 model_selector: ModelSelector, adventure_setup: AdventureSetup, 
+                 gwhr: GWHR, llm_interface: LLMInterface): 
         self.api_key_manager = api_key_manager
         self.ui_manager = ui_manager
         self.model_selector = model_selector
         self.adventure_setup = adventure_setup
-        self.gwhr = gwhr
-        self.llm_interface = llm_interface
-        self.current_game_state: str = "INIT"
-        self.active_combat_data: dict = {}
+        self.gwhr = gwhr 
+        self.llm_interface = llm_interface 
+        self.current_game_state: str = "INIT" 
+        self.active_combat_data: dict = {} 
         # self.game_engine will be initialized later
 
     def request_and_validate_api_key(self) -> bool:
         self.ui_manager.show_api_key_screen()
-        key_input = input()
+        key_input = input() 
         self.api_key_manager.store_api_key(key_input)
         is_valid = self.api_key_manager.validate_api_key()
         if is_valid:
@@ -123,7 +123,7 @@ class GameController:
                 self.gwhr.update_state({'knowledge_codex': all_codex_entries})
                 self.ui_manager.display_message(f"New Knowledge Unlocked: {entry_data.get('title', kid)}!", "growth")
                 self.gwhr.log_event(
-                    f"Knowledge unlocked: {entry_data.get('title', kid)} (ID: {kid})",
+                    f"Knowledge unlocked: {entry_data.get('title', kid)} (ID: {kid})", 
                     event_type="knowledge_unlock", payload=entry_data)
             except json.JSONDecodeError as e:
                 self.ui_manager.display_message(f"GameController: Error parsing codex entry from LLM: {e}", "error")
@@ -145,12 +145,12 @@ class GameController:
             },
             'npcs': [],
             'last_turn_player_strategies': [
-                {"id": "standard_attack", "name": "Standard Attack"},
+                {"id": "standard_attack", "name": "Standard Attack"}, 
                 {"id": "power_attack", "name": "Power Attack (Low Hit, High Dmg)"},
                 {"id": "quick_attack", "name": "Quick Attack (High Hit, Low Dmg)"},
-                {"id": "defend", "name": "Defend"},
+                {"id": "defend", "name": "Defend"}, 
                 {"id": "try_flee", "name": "Attempt to Flee"}
-            ],
+            ], 
             'combat_ended': False, 'victor': None, 'final_summary_narrative': ''
         }
         all_gwhr_npcs = self.gwhr.get_data_store().get('npcs', {})
@@ -197,7 +197,7 @@ class GameController:
                         restored_npc_data.setdefault('attributes', {})['current_hp'] = npc_combat_data['current_hp']
                         if npc_combat_data['current_hp'] <= 0: restored_npc_data['status'] = 'defeated'
                         npcs_gwhr_full_update[npc_id_to_update] = restored_npc_data
-                    else:
+                    else: 
                          npcs_gwhr_full_update[npc_id_to_update] = npc_combat_data['original_gwhr_data_snapshot']
                          npcs_gwhr_full_update[npc_id_to_update].setdefault('attributes',{})['current_hp'] = npc_combat_data['current_hp']
                          if npc_combat_data['current_hp'] <= 0: npcs_gwhr_full_update[npc_id_to_update]['status'] = 'defeated'
@@ -260,13 +260,13 @@ class GameController:
                 self.gwhr.log_event("All NPCs defeated by HP loss.", event_type="combat_end_condition")
 
     def evaluate_environmental_puzzle_action(self, puzzle_id: str, element_id_acted_on: str, item_id_used: str = None):
-        self.current_game_state = "PROCESSING_ACTION"
+        self.current_game_state = "PROCESSING_ACTION" 
         self.ui_manager.display_message(f"Interacting with puzzle: '{puzzle_id}', element: '{element_id_acted_on}'...", "info")
         self.gwhr.log_event(f"Player interacts with puzzle '{puzzle_id}', element '{element_id_acted_on}'" + (f" using item '{item_id_used}'" if item_id_used else ""), event_type="puzzle_interaction")
-
+    
         all_puzzle_states = self.gwhr.get_data_store().get('environmental_puzzle_log', {})
-        current_puzzle_specific_state = copy.deepcopy(all_puzzle_states.get(puzzle_id, {}))
-
+        current_puzzle_specific_state = copy.deepcopy(all_puzzle_states.get(puzzle_id, {})) 
+    
         current_scene_data = self.gwhr.get_data_store().get('current_scene_data', {})
         scene_context_for_prompt = {
             "scene_id": current_scene_data.get('scene_id'),
@@ -276,7 +276,7 @@ class GameController:
         llm_prompt = (
             f"Context: Player is interacting with an environmental puzzle.\n"
             f"Puzzle ID: {puzzle_id}\n"
-            f"Element Acted Upon ID: {element_id_acted_on}\n"
+            f"Element Acted Upon ID: {element_id_acted_on}\n" 
             f"Item Used ID: {item_id_used if item_id_used else 'None'}\n"
             f"Current Known State of this Puzzle (elements_state, clues_found, status): {json.dumps(current_puzzle_specific_state)}\n"
             f"Relevant Scene Context: {json.dumps(scene_context_for_prompt)}\n\n"
@@ -287,7 +287,7 @@ class GameController:
             f"and 'solution_narrative' (optional string if solved)."
           )
         model_id = self.model_selector.get_selected_model()
-        if not model_id:
+        if not model_id: 
             self.ui_manager.display_message("GameController: CRITICAL: No model selected for puzzle evaluation!", "error"); self.current_game_state = "AWAITING_PLAYER_ACTION"; return
         eval_json_str = self.llm_interface.generate(llm_prompt, model_id, 'environmental_puzzle_solution_eval')
         eval_data = {}
@@ -300,19 +300,19 @@ class GameController:
                 self.ui_manager.display_message(f"The puzzle's reaction is confusing (JSON Error: {e}).", "error")
                 eval_data = {"action_feedback_narrative": "A strange energy crackles, but the effect is unclear."}
         feedback_narrative = eval_data.get('action_feedback_narrative', "You interact with the puzzle element.")
-        self.ui_manager.display_narrative(feedback_narrative)
+        self.ui_manager.display_narrative(feedback_narrative) 
         puzzle_state_changed_by_action = eval_data.get('puzzle_state_changed', False)
         if puzzle_state_changed_by_action:
             updated_elements_from_llm = eval_data.get('updated_puzzle_elements_state', {})
             if not isinstance(current_puzzle_specific_state.get('elements_state'), dict): current_puzzle_specific_state['elements_state'] = {}
             current_puzzle_specific_state['elements_state'].update(updated_elements_from_llm)
             new_clues_from_llm = eval_data.get('new_clues_revealed', [])
-            if new_clues_from_llm:
+            if new_clues_from_llm: 
                 current_clues = current_puzzle_specific_state.setdefault('clues_found', [])
                 for clue in new_clues_from_llm:
                     if clue not in current_clues: current_clues.append(clue)
                 self.ui_manager.display_message(f"New clues found for puzzle '{puzzle_id}': {', '.join(new_clues_from_llm)}", "info")
-            all_puzzle_states[puzzle_id] = current_puzzle_specific_state
+            all_puzzle_states[puzzle_id] = current_puzzle_specific_state 
             self.gwhr.update_state({'environmental_puzzle_log': all_puzzle_states})
             self.gwhr.log_event(f"Puzzle '{puzzle_id}' state changed. Elements: {updated_elements_from_llm}. Clues: {new_clues_from_llm}.", event_type="puzzle_update", payload=eval_data)
             # TODO: Conceptual hookup for knowledge from puzzle clues
@@ -334,8 +334,8 @@ class GameController:
             # if isinstance(eval_data.get('knowledge_from_solution'), list):
             #    for knowledge_item in eval_data.get('knowledge_from_solution'):
             #        self.unlock_knowledge_entry("puzzle_solution", f"Puzzle {puzzle_id}", knowledge_item.get('summary', knowledge_item.get('topic_id')))
-
-        self.advance_time(1)
+        
+        self.advance_time(1) 
         self.current_game_state = "AWAITING_PLAYER_ACTION"
         self.ui_manager.display_scene(self.gwhr.get_data_store().get('current_scene_data', {}))
 
@@ -343,9 +343,9 @@ class GameController:
         # original_game_state = self.current_game_state # Not strictly needed if we always aim for AWAITING_PLAYER_ACTION
         self.current_game_state = "NPC_DIALOGUE"
         self.ui_manager.display_message(f"\nStarting dialogue with NPC ID: {npc_id}...", "info")
-
+        
         all_npcs_data = self.gwhr.get_data_store().get('npcs', {})
-        npc_data_snapshot = copy.deepcopy(all_npcs_data.get(npc_id))
+        npc_data_snapshot = copy.deepcopy(all_npcs_data.get(npc_id)) 
 
         if not npc_data_snapshot:
             self.ui_manager.display_message(f"Error: NPC with ID '{npc_id}' not found in GWHR.", "error")
@@ -353,21 +353,21 @@ class GameController:
             return
 
         npc_name = npc_data_snapshot.get('name', npc_id)
-        player_input_for_llm = initial_player_input if initial_player_input is not None else "..."
+        player_input_for_llm = initial_player_input if initial_player_input is not None else "..." 
 
         while self.current_game_state == "NPC_DIALOGUE":
-            gwhr_snapshot = self.gwhr.get_current_context()
+            gwhr_snapshot = self.gwhr.get_current_context() 
 
             npc_specific_context = {
-                "id": npc_data_snapshot.get('id'), "name": npc_name,
-                "description": npc_data_snapshot.get('description', '')[:100] + "...",
-                "role": npc_data_snapshot.get('role'),
-                "attributes": npc_data_snapshot.get('attributes'),
-                "status": npc_data_snapshot.get('status'),
-                "knowledge_preview": [k.get('topic_id', k) for k in npc_data_snapshot.get('knowledge', [])[:3]],
-                "dialogue_log_with_player_preview": npc_data_snapshot.get('dialogue_log', [])[-2:]
+                "id": npc_data_snapshot.get('id'), "name": npc_name, 
+                "description": npc_data_snapshot.get('description', '')[:100] + "...", 
+                "role": npc_data_snapshot.get('role'), 
+                "attributes": npc_data_snapshot.get('attributes'), 
+                "status": npc_data_snapshot.get('status'), 
+                "knowledge_preview": [k.get('topic_id', k) for k in npc_data_snapshot.get('knowledge', [])[:3]], 
+                "dialogue_log_with_player_preview": npc_data_snapshot.get('dialogue_log', [])[-2:] 
             }
-
+            
             prompt_context_for_llm = {
                 "player_state_summary": {
                     "attributes": gwhr_snapshot.get('player_state',{}).get('attributes'),
@@ -379,7 +379,7 @@ class GameController:
                 },
                 "game_time": gwhr_snapshot.get('current_game_time')
             }
-
+            
             llm_prompt = (
                 f"You are roleplaying as {npc_name} (ID: {npc_id}).\n"
                 f"Your Character Details (NPC): {json.dumps(npc_specific_context, indent=2)}\n"
@@ -399,7 +399,7 @@ class GameController:
                 self.ui_manager.display_message("GameController: CRITICAL Error - No model selected for LLM call in dialogue.", "error")
                 self.current_game_state = "GAME_OVER"
                 break
-
+            
             response_json_str = self.llm_interface.generate(llm_prompt, model_id, expected_response_type='npc_dialogue_response')
 
             if not response_json_str:
@@ -407,7 +407,7 @@ class GameController:
                 player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
                 if player_input_for_llm.lower() in ["/bye", "/end"]:
                     self.current_game_state = "AWAITING_PLAYER_ACTION" # Exit dialogue
-                continue
+                continue 
 
             try:
                 dialogue_data = json.loads(response_json_str)
@@ -420,39 +420,39 @@ class GameController:
 
             npc_actual_response_text = dialogue_data.get('dialogue_text', f"({npc_name} seems unresponsive.)")
             player_reply_options = dialogue_data.get('dialogue_options_for_player')
-
+            
             self.ui_manager.display_npc_dialogue(npc_name, npc_actual_response_text, player_reply_options)
 
             npc_data_snapshot['status'] = dialogue_data.get('new_npc_status', npc_data_snapshot.get('status'))
             dialogue_log_entry = {'player': player_input_for_llm, 'npc': npc_actual_response_text, 'time': self.gwhr.data_store.get('current_game_time')}
             npc_data_snapshot.setdefault('dialogue_log', []).append(dialogue_log_entry)
             npc_data_snapshot['last_interaction_time'] = self.gwhr.data_store.get('current_game_time')
-
+            
             attitude_change_str = dialogue_data.get('attitude_towards_player_change', '0')
             try:
-                attitude_change = int(attitude_change_str)
+                attitude_change = int(attitude_change_str) 
                 npc_data_snapshot.setdefault('attributes', {}).setdefault('disposition_towards_player', 0)
                 npc_data_snapshot['attributes']['disposition_towards_player'] += attitude_change
             except ValueError:
                 self.ui_manager.display_message(f"Warning: Invalid attitude_towards_player_change format: {attitude_change_str}", "warning")
-
+            
             # Example conceptual hookup:
             if isinstance(dialogue_data.get('knowledge_revealed'), list):
                 for knowledge_item in dialogue_data.get('knowledge_revealed'):
                     if isinstance(knowledge_item, dict) and 'topic_id' in knowledge_item and 'summary' in knowledge_item:
                         self.unlock_knowledge_entry(
-                            source_type="dialogue",
-                            source_detail=f"NPC {npc_name} (ID: {npc_id})",
+                            source_type="dialogue", 
+                            source_detail=f"NPC {npc_name} (ID: {npc_id})", 
                             context_prompt_hint=knowledge_item.get('summary', knowledge_item.get('topic_id'))
                         )
 
             current_npcs_in_gwhr = self.gwhr.get_data_store().get('npcs', {})
-            current_npcs_in_gwhr[npc_id] = npc_data_snapshot
-            self.gwhr.update_state({'npcs': current_npcs_in_gwhr})
-
+            current_npcs_in_gwhr[npc_id] = npc_data_snapshot 
+            self.gwhr.update_state({'npcs': current_npcs_in_gwhr}) 
+            
             self.gwhr.log_event(
                 f"Dialogue: Player: '{player_input_for_llm}', {npc_name}: '{npc_actual_response_text[:50]}...'. Attitude change: {attitude_change_str}.",
-                event_type="dialogue_exchange",
+                event_type="dialogue_exchange", 
                 causal_factors=[f"npc:{npc_id}"]
             )
 
@@ -463,29 +463,29 @@ class GameController:
             if player_reply_options:
                 self.ui_manager.display_message("You can choose an option or type your own reply (or /bye to end).", "info")
                 raw_next_input = self.ui_manager.get_free_text_input(f"Your response to {npc_name}: ")
-
+                
                 processed_choice = False
-                try:
+                try: 
                     choice_num = int(raw_next_input)
                     if 1 <= choice_num <= len(player_reply_options):
                         selected_option = player_reply_options[choice_num-1]
-                        player_input_for_llm = selected_option.get('name', selected_option.get('id'))
+                        player_input_for_llm = selected_option.get('name', selected_option.get('id')) 
                         self.gwhr.log_event(f"Player selected dialogue option: '{player_input_for_llm}' (ID: {selected_option.get('id')})", event_type="player_dialogue_choice")
                         processed_choice = True
                 except ValueError:
-                    pass
-
+                    pass 
+                
                 if not processed_choice:
-                    player_input_for_llm = raw_next_input
+                    player_input_for_llm = raw_next_input 
             else:
                 player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
 
             if player_input_for_llm.lower() in ["/bye", "/end"]:
                 self.current_game_state = "AWAITING_PLAYER_ACTION" # Player ends dialogue
-
+        
         self.ui_manager.display_message(f"\nDialogue with {npc_name} ended.", "info")
         # Ensure state is reverted if loop somehow exited while still NPC_DIALOGUE
-        if self.current_game_state == "NPC_DIALOGUE":
+        if self.current_game_state == "NPC_DIALOGUE": 
             self.current_game_state = "AWAITING_PLAYER_ACTION"
 
     def advance_time(self, duration: int = 1):
@@ -493,7 +493,7 @@ class GameController:
         new_time = current_time + duration
         self.gwhr.update_state({'current_game_time': new_time})
         self.gwhr.log_event(f"Time advanced by {duration} unit(s). New game time is {new_time}.", event_type="time_passage")
-
+        
         self.check_and_update_time_based_events() # Call the new method
 
     def validate_and_get_action_id(self, command: str, choices: list) -> str | None:
@@ -520,7 +520,7 @@ class GameController:
         gwhr_data = self.gwhr.get_data_store()
         player_state_for_menu = copy.deepcopy(gwhr_data.get('player_state', {}))
         codex_for_menu = copy.deepcopy(gwhr_data.get('knowledge_codex', {}))
-
+        
         # UIManager.show_game_systems_menu expects player_state_data to potentially contain codex for UI
         # Let's prepare a combined dict for it, or adjust UIManager if direct passing is better.
         # Plan for UIManager (subtask 33) was: player_state_data.get('knowledge_codex_for_ui', {})
@@ -532,7 +532,7 @@ class GameController:
             # Pass the combined data structure
             # UIManager.display_knowledge_codex_ui returns a tuple (action_type, data) or None
             menu_result_tuple = self.ui_manager.show_game_systems_menu(menu_display_data)
-
+            
             action_type = None
             # selected_data = None # Not used yet from codex UI return in this controller
 
@@ -542,7 +542,7 @@ class GameController:
                 pass # Not used for now as show_game_systems_menu returns simple string
 
             # show_game_systems_menu currently returns a simple string: 'close_menu' or 'show_menu_again'
-            menu_action_result = menu_result_tuple
+            menu_action_result = menu_result_tuple 
 
             if menu_action_result == 'close_menu':
                 break
@@ -559,12 +559,12 @@ class GameController:
                 # So menu_display_data should BE player_state, augmented with knowledge_codex_for_ui.
                 # Let's reconstruct it properly before each call to show_game_systems_menu if data can change within sub-screens.
                 # For now, assuming sub-screens are read-only displays.
-                continue
+                continue 
             # No other actions from this menu result in direct game state changes yet handled here.
 
     def trigger_dynamic_event(self, event_id_hint: str, is_npc_driven: bool = False):
         self.ui_manager.display_message(f"A dynamic event '{event_id_hint}' is being triggered...", "info")
-
+        
         current_time = self.gwhr.get_data_store().get('current_game_time', 0)
         llm_prompt = (
             f"Event Hint: {event_id_hint}\n"
@@ -576,7 +576,7 @@ class GameController:
             f"'effects_on_world' (list of strings, describing changes to game state, environment, or NPC status; these are for logging and potential future state changes), "
             f"'new_scene_id' (optional string, if the event forces an immediate scene change)."
         )
-
+        
         model_id = self.model_selector.get_selected_model()
         if not model_id:
             self.ui_manager.display_message("GameController: Error - No model selected for dynamic event generation.", "error")
@@ -588,21 +588,21 @@ class GameController:
             try:
                 event_data = json.loads(json_str)
                 description = event_data.get('description', 'An unexpected event occurred, but its nature is unclear.')
-
+                
                 self.ui_manager.display_dynamic_event_notification(description)
-
+                
                 # Log the full event data to dynamic_world_events_log in GWHR
                 # GWHR's __init__ ensures dynamic_world_events_log is a list
                 log_entry = {'timestamp': current_time, **event_data} # Add timestamp to the event data
-
+                
                 # Get a copy, append, then update_state to ensure deepcopy and proper handling by GWHR
                 current_dwel = copy.deepcopy(self.gwhr.get_data_store().get('dynamic_world_events_log', []))
                 current_dwel.append(log_entry)
                 self.gwhr.update_state({'dynamic_world_events_log': current_dwel})
-
+                
                 self.gwhr.log_event(
-                    f"Dynamic event: {event_data.get('event_id', event_id_hint)}. Outcome: {description}",
-                    event_type="dynamic_event",
+                    f"Dynamic event: {event_data.get('event_id', event_id_hint)}. Outcome: {description}", 
+                    event_type="dynamic_event", 
                     payload=event_data
                 )
 
@@ -621,7 +621,7 @@ class GameController:
                 new_scene_id_from_event = event_data.get('new_scene_id')
                 if new_scene_id_from_event:
                     self.ui_manager.display_message(f"The event transitions to a new scene: {new_scene_id_from_event}", "info")
-                    self.initiate_scene(new_scene_id_from_event)
+                    self.initiate_scene(new_scene_id_from_event) 
                 else:
             pass # State handling as before
 
@@ -632,14 +632,14 @@ class GameController:
 
     def check_and_update_time_based_events(self):
         current_time = self.gwhr.get_data_store().get('current_game_time', 0)
-
+        
         # Example: Every 10 turns, chance of weather change
         if current_time > 0 and current_time % 10 == 0: # Trigger on turns 10, 20, 30...
             self.ui_manager.display_message("The air shifts... the weather might be changing.", "info")
-
+            
             current_world_state = self.gwhr.get_data_store().get('world_state', {})
             current_weather = current_world_state.get('current_weather', {"condition":"unknown"}) # Get current weather
-
+            
             llm_prompt = (
                 f"Old Condition: {current_weather.get('condition','clear')}\n"
                 f"Current Game Time: {current_time}\n" # Provide game time for context
@@ -654,7 +654,7 @@ class GameController:
                 return
 
             json_str = self.llm_interface.generate(llm_prompt, model_id, 'weather_update_description')
-
+            
             if json_str:
                 try:
                     weather_data = json.loads(json_str)
@@ -666,30 +666,30 @@ class GameController:
                         "effects_description": weather_data.get('weather_effects_description', 'The weather remains difficult to discern.')
                     }
                     self.gwhr.update_state({'world_state': updated_world_state})
-
+                    
                     self.ui_manager.display_dynamic_event_notification(
                         f"Weather changes: {weather_data.get('weather_effects_description', 'The atmosphere shifts.')}"
                     )
                     self.gwhr.log_event(
                         f"Weather changed to {weather_data.get('new_weather_condition', 'unknown')}, intensity {weather_data.get('new_weather_intensity', 'unknown')}.",
-                        event_type="weather_change",
+                        event_type="weather_change", 
                         payload=weather_data
                     )
                 except json.JSONDecodeError as e:
                     self.ui_manager.display_message(f"GameController: Error parsing weather data from LLM: {e}", "error")
             else:
                 self.ui_manager.display_message("GameController: LLM failed to describe weather change.", "error")
-
+        
         # TODO: Add more time-based event triggers here if needed.
 
     def evaluate_environmental_puzzle_action(self, puzzle_id: str, element_id_acted_on: str, item_id_used: str = None):
-        self.current_game_state = "PROCESSING_ACTION"
+        self.current_game_state = "PROCESSING_ACTION" 
         self.ui_manager.display_message(f"Interacting with puzzle: '{puzzle_id}', element: '{element_id_acted_on}'...", "info")
         self.gwhr.log_event(f"Player interacts with puzzle '{puzzle_id}', element '{element_id_acted_on}'" + (f" using item '{item_id_used}'" if item_id_used else ""), event_type="puzzle_interaction")
-
+    
         all_puzzle_states = self.gwhr.get_data_store().get('environmental_puzzle_log', {})
-        current_puzzle_specific_state = copy.deepcopy(all_puzzle_states.get(puzzle_id, {}))
-
+        current_puzzle_specific_state = copy.deepcopy(all_puzzle_states.get(puzzle_id, {})) 
+    
         current_scene_data = self.gwhr.get_data_store().get('current_scene_data', {})
         scene_context_for_prompt = {
             "scene_id": current_scene_data.get('scene_id'),
@@ -699,7 +699,7 @@ class GameController:
         llm_prompt = (
             f"Context: Player is interacting with an environmental puzzle.\n"
             f"Puzzle ID: {puzzle_id}\n"
-            f"Element Acted Upon ID: {element_id_acted_on}\n"
+            f"Element Acted Upon ID: {element_id_acted_on}\n" 
             f"Item Used ID: {item_id_used if item_id_used else 'None'}\n"
             f"Current Known State of this Puzzle (elements_state, clues_found, status): {json.dumps(current_puzzle_specific_state)}\n"
             f"Relevant Scene Context: {json.dumps(scene_context_for_prompt)}\n\n"
@@ -710,7 +710,7 @@ class GameController:
             f"and 'solution_narrative' (optional string if solved)."
           )
         model_id = self.model_selector.get_selected_model()
-        if not model_id:
+        if not model_id: 
             self.ui_manager.display_message("GameController: CRITICAL: No model selected for puzzle evaluation!", "error"); self.current_game_state = "AWAITING_PLAYER_ACTION"; return
         eval_json_str = self.llm_interface.generate(llm_prompt, model_id, 'environmental_puzzle_solution_eval')
         eval_data = {}
@@ -723,19 +723,19 @@ class GameController:
                 self.ui_manager.display_message(f"The puzzle's reaction is confusing (JSON Error: {e}).", "error")
                 eval_data = {"action_feedback_narrative": "A strange energy crackles, but the effect is unclear."}
         feedback_narrative = eval_data.get('action_feedback_narrative', "You interact with the puzzle element.")
-        self.ui_manager.display_narrative(feedback_narrative)
+        self.ui_manager.display_narrative(feedback_narrative) 
         puzzle_state_changed_by_action = eval_data.get('puzzle_state_changed', False)
         if puzzle_state_changed_by_action:
             updated_elements_from_llm = eval_data.get('updated_puzzle_elements_state', {})
             if not isinstance(current_puzzle_specific_state.get('elements_state'), dict): current_puzzle_specific_state['elements_state'] = {}
             current_puzzle_specific_state['elements_state'].update(updated_elements_from_llm)
             new_clues_from_llm = eval_data.get('new_clues_revealed', [])
-            if new_clues_from_llm:
+            if new_clues_from_llm: 
                 current_clues = current_puzzle_specific_state.setdefault('clues_found', [])
                 for clue in new_clues_from_llm:
                     if clue not in current_clues: current_clues.append(clue)
                 self.ui_manager.display_message(f"New clues found for puzzle '{puzzle_id}': {', '.join(new_clues_from_llm)}", "info")
-            all_puzzle_states[puzzle_id] = current_puzzle_specific_state
+            all_puzzle_states[puzzle_id] = current_puzzle_specific_state 
             self.gwhr.update_state({'environmental_puzzle_log': all_puzzle_states})
             self.gwhr.log_event(f"Puzzle '{puzzle_id}' state changed. Elements: {updated_elements_from_llm}. Clues: {new_clues_from_llm}.", event_type="puzzle_update", payload=eval_data)
             # TODO: Conceptual hookup for knowledge from puzzle clues
@@ -757,8 +757,8 @@ class GameController:
             # if isinstance(eval_data.get('knowledge_from_solution'), list):
             #    for knowledge_item in eval_data.get('knowledge_from_solution'):
             #        self.unlock_knowledge_entry("puzzle_solution", f"Puzzle {puzzle_id}", knowledge_item.get('summary', knowledge_item.get('topic_id')))
-
-        self.advance_time(1)
+        
+        self.advance_time(1) 
         self.current_game_state = "AWAITING_PLAYER_ACTION"
         self.ui_manager.display_scene(self.gwhr.get_data_store().get('current_scene_data', {}))
 
@@ -767,10 +767,10 @@ class GameController:
         self.current_game_state = "PRESENTING_SCENE"
         self.ui_manager.display_message(f"GameController: Loading scene '{scene_id}'...", "info")
         self.gwhr.log_event(f"Initiating scene: {scene_id}", event_type="scene_load")
-
+        
         # Get context (currently full dump, will be refined)
-        context_for_llm = self.gwhr.get_current_context()
-
+        context_for_llm = self.gwhr.get_current_context() 
+        
         # Limit context size for prompt (example: take first 1000 chars of JSON string)
         context_json_str = json.dumps(context_for_llm, indent=2)
         truncated_context_str = context_json_str[:1000]
@@ -784,7 +784,7 @@ class GameController:
             "specified by 'Requested Scene ID'. Ensure the output is a single valid JSON object adhering to the "
             "established scene data structure. The 'scene_id' in your response should match the 'Requested Scene ID'."
         )
-
+        
         model_id = self.model_selector.get_selected_model()
         if not model_id:
             self.ui_manager.display_message("GameController: CRITICAL - No model selected for LLM call during scene initiation.", "error")
@@ -803,7 +803,7 @@ class GameController:
                         f"does not match requested '{scene_id}'. Using requested ID.", "warning"
                     )
                     scene_data['scene_id'] = scene_id # Force consistency
-
+                
                 # --- Image Generation for new scene ---
                 narrative_for_prompt = scene_data.get('narrative', '')
                 npcs_for_prompt = ", ".join([npc.get('name', 'N/A') for npc in scene_data.get('npcs_in_scene', []) if npc.get('name')])
@@ -843,7 +843,7 @@ class GameController:
         self.current_game_state = "PROCESSING_ACTION"
         self.ui_manager.display_message(f"GameController: Processing action: {action_type} on '{action_detail}'...", "info")
         self.gwhr.log_event(f"Player action: {action_type} on element '{action_detail}'", event_type="player_action")
-
+        
         self.advance_time(1) # Advance game time by 1 unit
 
         # Check if this action is a dialogue trigger
@@ -855,26 +855,26 @@ class GameController:
             npc_id_to_talk_to = chosen_element['target_id']
             initial_dialogue_input = f"Selected interaction: '{chosen_element.get('name', action_detail)}'"
             self.handle_npc_dialogue(npc_id_to_talk_to, initial_player_input=initial_dialogue_input)
-            return
+            return 
         elif chosen_element and chosen_element.get('type') == 'combat_trigger' and chosen_element.get('target_id'):
             npc_id_to_engage = chosen_element['target_id']
             # It's good practice to use .get with a fallback for name display
-            npc_name_display = chosen_element.get('name', npc_id_to_engage)
+            npc_name_display = chosen_element.get('name', npc_id_to_engage) 
             self.ui_manager.display_message(f"You chose to engage {npc_name_display} in combat!", "info")
-            self.initiate_combat(npc_ids_to_engage=[npc_id_to_engage])
+            self.initiate_combat(npc_ids_to_engage=[npc_id_to_engage]) 
             return # Combat loop will take over.
         elif chosen_element and chosen_element.get('type') == 'puzzle_element':
             puzzle_id = chosen_element.get('puzzle_id')
-            element_acted_on_id = chosen_element.get('id')
+            element_acted_on_id = chosen_element.get('id') 
             item_used_id = None # Placeholder for now
             if puzzle_id and element_acted_on_id:
                 self.evaluate_environmental_puzzle_action(puzzle_id, element_acted_on_id, item_used_id)
-                return
-            else:
+                return 
+            else: 
                 self.ui_manager.display_message("Error: Puzzle element data is incomplete for processing.", "error")
-                self.current_game_state = "AWAITING_PLAYER_ACTION"
+                self.current_game_state = "AWAITING_PLAYER_ACTION" 
                 return
-
+        
         # If not a dialogue or combat_trigger action, proceed with generic action processing:
         context_for_llm = self.gwhr.get_current_context()
         current_scene_id_from_gwhr = context_for_llm.get('current_scene_data', {}).get('scene_id', 'UNKNOWN_SCENE')
@@ -888,7 +888,7 @@ class GameController:
         current_scene_elements = context_for_llm.get('current_scene_data', {}).get('interactive_elements', [])
         chosen_element_info = next((el for el in current_scene_elements if el.get('id') == action_detail), None)
         chosen_element_name = chosen_element_info.get('name', action_detail) if chosen_element_info else action_detail
-
+        
         prompt = (
             f"Current Game Context (JSON):\n{truncated_context_str}\n\n"
             f"Player selected the option '{chosen_element_name}' (ID: '{action_detail}') from the interaction menu in scene '{current_scene_id_from_gwhr}'.\n\n"
@@ -897,7 +897,7 @@ class GameController:
             f"If updating the current scene, the response can omit 'scene_id' or use the current one ('{current_scene_id_from_gwhr}'), but should detail changes, potentially including a 'narrative_update' field. "
             f"Ensure the output is a single valid JSON object structured as scene data."
         )
-
+        
         model_id = self.model_selector.get_selected_model()
         if not model_id:
             self.ui_manager.display_message("GameController: CRITICAL - No model selected for LLM call during action processing.", "error")
@@ -911,7 +911,7 @@ class GameController:
                 response_data = json.loads(response_json_str)
                 new_scene_id = response_data.get('scene_id')
 
-
+                
                 # --- Image Generation for action outcome scene data ---
                 narrative_for_prompt_action = response_data.get('narrative', '')
                 npcs_for_prompt_action = ", ".join([npc.get('name', 'N/A') for npc in response_data.get('npcs_in_scene', []) if npc.get('name')])
@@ -941,7 +941,7 @@ class GameController:
                 elif new_scene_id == current_scene_id_from_gwhr and response_data.get('narrative'): # Update to current scene (full refresh)
                     self.ui_manager.display_message(f"GameController: Current scene '{current_scene_id_from_gwhr}' updated.", "info")
                     self.gwhr.update_state({'current_scene_data': response_data}) # response_data now includes weather
-                    self.ui_manager.display_scene(response_data)
+                    self.ui_manager.display_scene(response_data) 
                 elif response_data.get('narrative_update'): # A specific narrative update for current scene
                     # This path might need more fleshing out if LLM is expected to send *only* narrative_update
                     # and not a full scene. The image logic above assumes response_data is the new full scene data.
@@ -953,7 +953,7 @@ class GameController:
                 else: # Fallback or unrecognized partial update
                     self.ui_manager.display_message("GameController: Action resulted in a minor or unclear update. Re-displaying current scene context.", "info")
                     self.ui_manager.display_scene(self.gwhr.get_data_store().get('current_scene_data', {}))
-
+                
                 # --- Player Growth/Update Processing ---
                 if 'player_updates' in response_data:
                     updates_to_log = []
@@ -984,14 +984,14 @@ class GameController:
                                                 new_value = int(change)
                                         elif isinstance(change, (int, float)): # Absolute value
                                             new_value = int(change) # cast to int just in case
-                                        else:
+                                        else: 
                                             self.ui_manager.display_message(f"Warning: Unrecognized attribute change format for {attr}: {change}", "warning")
                                             continue
 
                                         player_attributes[attr] = new_value
                                         player_state_modified = True
                                         update_msg = f"Attribute {attr} changed from {current_value} to {new_value}."
-                                        self.ui_manager.display_message(update_msg, "growth")
+                                        self.ui_manager.display_message(update_msg, "growth") 
                                         updates_to_log.append(update_msg)
                                     except ValueError:
                                         self.ui_manager.display_message(f"Warning: Invalid value for attribute change {attr}: {change}", "warning")
@@ -999,7 +999,7 @@ class GameController:
                                     self.ui_manager.display_message(f"Warning: Attempt to update unknown attribute {attr}.", "warning")
                         else:
                             self.ui_manager.display_message(f"Warning: Malformed 'attributes' in player_updates (not a dict): {attributes_updates}", "warning")
-
+            
                     # Process skill updates
                     if 'skills_learned' in response_data['player_updates']:
                         skills_to_learn_list = response_data['player_updates']['skills_learned']
@@ -1046,15 +1046,15 @@ class GameController:
                             self.ui_manager.display_message(f"Warning: Malformed 'inventory_updates' in player_updates (not a dict): {inventory_changes}", "warning")
 
                     if player_state_modified and updates_to_log: # Only update GWHR if actual changes happened
-                        self.gwhr.update_state({'player_state': current_player_state_copy})
+                        self.gwhr.update_state({'player_state': current_player_state_copy}) 
                         self.gwhr.log_event(f"Player growth/update: {'; '.join(updates_to_log)}", event_type="player_update")
                 # --- End Player Growth/Update Processing ---
                 # TODO: Conceptual hookup for knowledge from generic actions
                 # if isinstance(response_data.get('knowledge_revealed_by_action'), list):
                 #    for knowledge_item in response_data.get('knowledge_revealed_by_action'):
                 #        self.unlock_knowledge_entry(
-                #            source_type="action_outcome",
-                #            source_detail=f"Action on element {action_detail} in scene {current_scene_id_from_gwhr}",
+                #            source_type="action_outcome", 
+                #            source_detail=f"Action on element {action_detail} in scene {current_scene_id_from_gwhr}", 
                 #            context_prompt_hint=knowledge_item.get('summary', knowledge_item.get('topic_id'))
                 #        )
 
@@ -1073,16 +1073,16 @@ class GameController:
             if self.current_game_state == "AWAITING_PLAYER_ACTION":
                 current_scene_data = self.gwhr.get_data_store().get('current_scene_data', {})
                 interactive_choices = current_scene_data.get('interactive_elements', [])
-
+                
                 # Display scene first, which now includes the (M) Game Menu hint
-                self.ui_manager.display_scene(current_scene_data)
+                self.ui_manager.display_scene(current_scene_data) 
 
                 if not interactive_choices: # Check after display_scene, as scene might say "no actions"
                     self.ui_manager.display_message("No interactive actions presented by the scene. The story might require a different approach or this path ends here.", "info")
                     self.current_game_state = "GAME_OVER" # Or some other state if game can continue without choices
                     self.gwhr.log_event("Game ended: No interactive choices available in scene.", event_type="game_flow_end")
-                    break
-
+                    break 
+                
                 raw_command = input("Your command (e.g., 1, 2, ..., or M for Menu): ").strip().lower()
 
                 if raw_command == 'm':
@@ -1101,14 +1101,14 @@ class GameController:
                     else:
                         self.ui_manager.display_message(f"Invalid command: '{raw_command}'. Please enter a valid action number or 'M' for the menu.", "error")
                         # Game state remains AWAITING_PLAYER_ACTION, loop will re-prompt after re-displaying scene.
-
-            elif self.current_game_state == "GAME_OVER":
-                break
-
+            
+            elif self.current_game_state == "GAME_OVER": 
+                break 
+            
             # Small delay to prevent tight loop if states are rapidly changing without blocking input
             # also makes game feel a bit more paced if LLM responses were instant.
-            time.sleep(0.1)
-
+            time.sleep(0.1) 
+        
         self.ui_manager.display_message("GameController: Exited game loop.", "info")
         if self.current_game_state == "GAME_OVER":
              self.ui_manager.display_message("Game Over.", "info")
@@ -1124,7 +1124,7 @@ class GameController:
         # The WCD from LLMInterface mock has "initial_plot_hook" but not a direct scene_id.
         # Let's assume a convention or add it to WCD later. For now, fixed ID.
         initial_scene_id_from_wcd = self.gwhr.get_data_store().get('initial_scene_id', 'scene_01_start')
-
+        
         if self.initiate_scene(initial_scene_id_from_wcd):
             self.game_loop()
         else:
@@ -1132,7 +1132,7 @@ class GameController:
             self.current_game_state = "GAME_OVER"
             # Log this specific failure
             self.gwhr.log_event(f"Game start failed: Could not initiate scene '{initial_scene_id_from_wcd}'.", event_type="game_flow_error")
-
+        
         if self.current_game_state == "GAME_OVER":
              self.ui_manager.display_message("Game Over.", "info") # Ensure game over is messaged if loop not entered.
 

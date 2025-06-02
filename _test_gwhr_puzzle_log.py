@@ -37,7 +37,7 @@ custom_puzzle_log_content = {
 }
 initial_data_with_puzzle_log = {
     "world_title": "World With Puzzles",
-    "environmental_puzzle_log": copy.deepcopy(custom_puzzle_log_content)
+    "environmental_puzzle_log": copy.deepcopy(custom_puzzle_log_content) 
 }
 gwhr_t3.initialize(initial_data_with_puzzle_log)
 store3 = gwhr_t3.get_data_store()
