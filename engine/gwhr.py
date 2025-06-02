@@ -26,7 +26,16 @@ class GWHR: # GameWorldHistoryRecorder
             'player_state': copy.deepcopy(default_player_state),
             'npcs': {},
             'combat_log': [],
-            'environmental_puzzle_log': {} # New puzzle log
+            'environmental_puzzle_log': {},
+            'knowledge_codex': {}, # New
+            'dynamic_world_events_log': [], # New
+            'world_state': { # New or ensure exists
+                'current_weather': { # New
+                    "condition": "clear",
+                    "intensity": "mild",
+                    "effects_description": "The sky is clear and the air is calm."
+                }
+            }
         }
 
     def initialize(self, initial_world_data: dict):
@@ -106,6 +115,19 @@ class GWHR: # GameWorldHistoryRecorder
         temp_store.setdefault('event_log', [])
         temp_store.setdefault('current_scene_data', {})
         temp_store.setdefault('combat_log', [])
+        temp_store.setdefault('knowledge_codex', {}) # New
+        temp_store.setdefault('dynamic_world_events_log', []) # New
+
+        # Ensure world_state and its current_weather sub-key are correctly defaulted
+        # Get the world_state from temp_store, defaulting to an empty dict if it wasn't in initial_world_data
+        # (though __init__ ensures it exists in self.data_store, and thus in temp_store initially)
+        world_state_in_temp = temp_store.setdefault('world_state', {})
+
+        # Get the default weather from the original self.data_store (from __init__)
+        # This is a bit indirect; simpler would be to define default_weather_structure once.
+        # However, this ensures we use the structure defined in __init__.
+        default_weather_structure = self.data_store['world_state']['current_weather']
+        world_state_in_temp.setdefault('current_weather', copy.deepcopy(default_weather_structure))
 
         self.data_store = temp_store # Assign the fully constructed store
 

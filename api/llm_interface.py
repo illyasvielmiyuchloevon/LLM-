@@ -65,9 +65,11 @@ class LLMInterface:
     {{"id": "pull_rusty_lever_A", "name": "Pull the rusty lever (Lever A)", "type": "puzzle_element", "puzzle_id": "lever_sequence_puzzle"}},
     {{"id": "talk_to_old_man_willow", "name": "Talk to Old Man Willow.", "type": "dialogue", "target_id": "old_man_willow_npc"}},
     {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}}
-    # Replaced 'inspect_signpost_detail' and 'enter_dark_forest' with puzzle elements
   ],
-  "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes. You notice strange symbols on the north wall and a rusty lever near the east passage."
+  "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes. You notice strange symbols on the north wall and a rusty lever near the east passage.",
+  "on_scene_load_knowledge": [ # New field for scene description
+    {{"topic_id": "crossroads_history", "summary": "This ancient crossroads seems to have been a significant meeting point for travelers of old, judging by the weathered signpost.", "source_type": "observation", "source_detail": "Crossroads Signpost examination"}}
+  ]
 }}
 '''
             print("LLMInterface: Mock LLM call successful (scene_description as JSON string).")
@@ -109,7 +111,7 @@ class LLMInterface:
   "new_npc_status": "curious",
   "attitude_towards_player_change": "+2",
   "knowledge_revealed": [
-    {{"topic_id": "local_dangers", "summary": "Implied this area can be dangerous based on your query."}}
+    {{"topic_id": "local_dangers", "summary": "The NPC warned that these woods are not safe for unprepared travelers, mentioning strange howls at dusk.", "source_type": "dialogue", "source_detail": f"NPC {npc_name_in_prompt} (ID: {npc_id_from_name})"}}
   ],
   "dialogue_options_for_player": [
     {{"id": "ask_npc_name_{npc_id_from_name}", "name": "Actually, I wanted to ask your name."}},
@@ -195,10 +197,14 @@ class LLMInterface:
                 updated_elements = {"altar_state": "sunstone_placed", "door_runes": "all_glowing"}
                 new_clues = ["The door seems to hum with energy."]
                 solution_narrative_text = "The massive stone door groans and slides open, revealing a dark passage!"
+                knowledge_from_puzzle = [{"topic_id": "rune_door_mechanism", "summary": "The Sunstone's interaction with the altar suggests a solar-powered ancient mechanism.", "source_type": "puzzle_solution", "source_detail": f"Puzzle {puzzle_id_in_prompt}"}]
             elif puzzle_id_in_prompt == "lever_sequence" and action_in_prompt == "pull_lever_A":
                 feedback_narrative = "You pull Lever A. A distant click is heard."
                 updated_elements = {"lever_A_state": "down"}
                 new_clues = ["One of the three lights above the door now glows green."]
+                knowledge_from_puzzle = [{"topic_id": "lever_puzzle_feedback_A", "summary": "Pulling Lever A illuminated one of three green lights by the door.", "source_type": "puzzle_interaction", "source_detail": f"Puzzle {puzzle_id_in_prompt}, Element {action_in_prompt}"}]
+            else: # Default for other actions
+                knowledge_from_puzzle = [] # Or None
 
             mock_json_string = f'''
 {{
@@ -208,10 +214,73 @@ class LLMInterface:
   "updated_puzzle_elements_state": {json.dumps(updated_elements if updated_elements else None)},
   "new_clues_revealed": {json.dumps(new_clues if new_clues else None)},
   "puzzle_solved": {json.dumps(solved_this_turn)},
-  "solution_narrative": {json.dumps(solution_narrative_text)}
+  "solution_narrative": {json.dumps(solution_narrative_text)},
+  "knowledge_revealed": {json.dumps(knowledge_from_puzzle if knowledge_from_puzzle else None)}
 }}
 '''
             print("LLMInterface: Mock LLM call successful (environmental_puzzle_solution_eval as JSON string).")
+            return mock_json_string
+        elif expected_response_type == 'codex_entry_generation':
+            hint = "unknown_topic"
+            source_type_echo = "unknown_source"
+            source_detail_echo = "unknown_detail"
+            if "Context Hint:" in prompt_str:
+                try: hint = prompt_str.split("Context Hint:")[1].split("\n")[0].strip()
+                except IndexError: pass
+            if "Source Type:" in prompt_str:
+                try: source_type_echo = prompt_str.split("Source Type:")[1].split("\n")[0].strip()
+                except IndexError: pass
+            if "Source Detail:" in prompt_str:
+                try: source_detail_echo = prompt_str.split("Source Detail:")[1].split("\n")[0].strip()
+                except IndexError: pass
+
+            mock_json_string = f'''
+{{
+  "knowledge_id": "{hint.lower().replace(' ', '_')}_codex",
+  "title": "On the Subject of: {hint.replace('_', ' ').title()}",
+  "content": "This is detailed lore about {hint.replace('_', ' ')}. It was discovered via {source_type_echo} from {source_detail_echo}. The implications are vast and connect to many untold stories of this land, detailing its complex history and the powers that shaped it.",
+  "source_type": "{source_type_echo}",
+  "source_detail": "{source_detail_echo}"
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (codex_entry_generation as JSON string).")
+            return mock_json_string
+        elif expected_response_type == 'dynamic_event_outcome':
+            hint = "unknown_event_trigger"
+            if "Event Hint:" in prompt_str:
+                try: hint = prompt_str.split("Event Hint:")[1].split("\n")[0].strip()
+                except IndexError: pass
+
+            mock_json_string = f'''
+{{
+  "event_id": "{hint.lower().replace(' ', '_')}_event_{self.api_key_manager.get_api_key()[-2:] if self.api_key_manager.get_api_key() else 'rand'}",
+  "description": "Suddenly, the ground trembles violently! Dust falls from the ceiling of the cave. It seems the recent '{hint}' has caused a minor cave-in nearby, altering the landscape.",
+  "effects_on_world": ["A narrow passage to the east that was previously clear is now blocked by rubble.", "A faint rumbling can be heard periodically from the depths.", "The air grows colder."],
+  "new_scene_id": null
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (dynamic_event_outcome as JSON string).")
+            return mock_json_string
+        elif expected_response_type == 'weather_update_description':
+            old_condition = "clear" # Default old condition
+            if "Old Condition:" in prompt_str:
+                try: old_condition = prompt_str.split("Old Condition:")[1].split("\n")[0].strip()
+                except IndexError: pass
+
+            new_cond, new_int, new_desc = "stormy", "violent", "A sudden, violent thunderstorm erupts! Lightning flashes and thunder cracks overhead, making travel treacherous and visibility poor."
+            if old_condition.lower() == "stormy": # Simple toggle for mock
+                new_cond, new_int, new_desc = "misty", "light", "The storm subsides, leaving a light, eerie mist clinging to everything. Visibility is reduced, and sounds are muffled."
+            elif old_condition.lower() == "misty":
+                new_cond, new_int, new_desc = "clear", "mild", "The mist gradually burns off as the sun ascends, revealing a clear sky. The air is calm and fresh."
+
+            mock_json_string = f'''
+{{
+  "new_weather_condition": "{new_cond}",
+  "new_weather_intensity": "{new_int}",
+  "weather_effects_description": "{new_desc}"
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (weather_update_description as JSON string).")
             return mock_json_string
         else:
             # Generic mock response for other types

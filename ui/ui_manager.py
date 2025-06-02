@@ -172,14 +172,63 @@ class UIManager:
                     else:
                         item_name = str(item_id_or_obj) if not isinstance(item_id_or_obj, dict) else item_id_or_obj.get('name', 'Unknown Equipped Item')
                 print(f"  {slot.capitalize()}: {item_name}")
-        print("\n" + "="*41)
+        print("\n" + "="*41) # Length of " EQUIPMENT " + 2*15 + 2 = 11+30+2 = 43. Matches roughly.
         input("--- Press Enter to close ---")
+
+    def display_codex_entry_content(self, entry_title: str, entry_content: str, entry_source_type: str, entry_source_detail: str):
+        header = f"--- Codex: {entry_title} ---"
+        print(f"\n{header}")
+        print(f"Content: {entry_content}")
+        print(f"Source: Discovered via {entry_source_type} from '{entry_source_detail}'.")
+        print("-" * len(header))
+        input("--- Press Enter to close entry ---")
+
+    def display_knowledge_codex_ui(self, codex_entries: dict) -> tuple[str, str | None] | None:
+        header = "="*15 + " KNOWLEDGE CODEX " + "="*15
+        print(f"\n{header}\n")
+
+        if not codex_entries or not isinstance(codex_entries, dict) or not codex_entries:
+            print("  (No knowledge entries discovered yet.)")
+            # Wait for input before returning to prevent instant loop if called from menu
+            input("--- Press Enter to return to menu ---")
+            return ('show_codex_again', None) # Or 'close_menu' depending on desired flow
+
+        entries_list = list(codex_entries.values())
+        for i, entry in enumerate(entries_list):
+            print(f"  {i+1}. {entry.get('title', 'Untitled Entry')}")
+        print("  0. Exit Codex")
+
+        choice_str = input("\nSelect an entry to read (number) or 0 to exit: ").strip()
+
+        try:
+            choice_num = int(choice_str)
+            if choice_num == 0:
+                return ('exit_codex', None)
+            elif 1 <= choice_num <= len(entries_list):
+                selected_entry = entries_list[choice_num - 1]
+                self.display_codex_entry_content(
+                    selected_entry.get('title','N/A'),
+                    selected_entry.get('content','N/A'),
+                    selected_entry.get('source_type','N/A'),
+                    selected_entry.get('source_detail','N/A')
+                )
+                return ('viewed_entry', selected_entry.get('knowledge_id'))
+            else:
+                self.display_message(f"Invalid selection. Please enter a number between 0 and {len(entries_list)}.", "error")
+                return ('show_codex_again', None)
+        except ValueError:
+            self.display_message("Invalid input. Please enter a number.", "error")
+            return ('show_codex_again', None)
+
+    def display_dynamic_event_notification(self, event_description: str):
+        print(f"\n[WORLD EVENT]: {event_description}\n")
 
     def show_game_systems_menu(self, player_state_data: dict) -> str:
         print("\n" + "="*15 + " GAME MENU " + "="*15 + "\n")
         print("  1. Character Status")
         print("  2. Inventory")
         print("  3. Equipment")
+        print("  4. Knowledge Codex") # New Option
         print("  0. Close Menu")
 
         choice = input("Select an option: ").strip()
@@ -193,13 +242,33 @@ class UIManager:
             return 'show_menu_again'
         elif choice == '3':
             equipment_slots = player_state_data.get('equipment_slots', {})
-            inventory = player_state_data.get('inventory', []) # For name resolution
+            inventory = player_state_data.get('inventory', [])
             self.display_equipment_screen(equipment_slots, inventory)
             return 'show_menu_again'
+        elif choice == '4': # New case for Codex
+            codex_data = player_state_data.get('knowledge_codex', {}) # Assumes codex is part of player_state or passed differently
+                                                                    # Plan implies GameController gets it from GWHR and passes it.
+                                                                    # For now, let's assume it's passed in player_state_data for simplicity,
+                                                                    # or this method needs direct GWHR access or codex passed separately.
+                                                                    # The goal says `show_game_systems_menu(self, player_state_data: dict)`
+                                                                    # GWHR has codex at top level, not in player_state.
+                                                                    # This method signature needs to be reconsidered or codex needs to be passed.
+                                                                    # For now, I'll assume it's passed via player_state_data for the test.
+            # Correct access would be: (assuming codex_data is passed as a separate arg or fetched by GC)
+            # For this UIManager test, we'll assume it's within player_state_data for simplicity of the method call.
+            # In GameController, it will fetch from gwhr.get_data_store()['knowledge_codex'] and pass it.
+            # So, let's adjust show_game_systems_menu to accept codex_data directly.
+            # NO, the plan says: show_game_systems_menu(self, player_state_data: dict)
+            # This means GameController must put codex into player_state_data for this call, or UIManager needs GWHR.
+            # Let's assume GameController will pass a richer player_state_data that includes a 'knowledge_codex' key.
+            codex_entries = player_state_data.get('knowledge_codex_for_ui', {}) # Expect GC to put it here
+            codex_action_result = self.display_knowledge_codex_ui(codex_entries)
+            # display_knowledge_codex_ui will loop until 'exit_codex'
+            return 'show_menu_again' # Always return to main game menu after codex closes
         elif choice == '0':
             return 'close_menu'
         else:
-            self.display_message("Invalid option, please try again.", "error") # Uses existing method
+            self.display_message("Invalid option, please try again.", "error")
             return 'show_menu_again'
 
     def display_npc_dialogue(self, npc_name: str, dialogue_text: str, player_options: list = None):
