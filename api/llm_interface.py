@@ -1,4 +1,5 @@
 import urllib.parse # For URL encoding image prompt snippets
+import json # For using json.dumps in mock responses
 from api.api_key_manager import ApiKeyManager # Assuming execution from root or PYTHONPATH configured
 
 class LLMInterface:
@@ -60,10 +61,11 @@ class LLMInterface:
   ],
   "interactive_elements": [
     {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}},
-    {{"id": "enter_dark_forest", "name": "Venture east into the ominous dark forest.", "type": "navigate"}},
+    {{"id": "challenge_raven_combat", "name": "Challenge the Mysterious Raven!", "type": "combat_trigger", "target_id": "mysterious_raven_npc"}},
     {{"id": "inspect_signpost_detail", "name": "Examine the weathered signpost closely.", "type": "examine", "target_id": "signpost_object"}},
     {{"id": "talk_to_old_man_willow", "name": "Talk to Old Man Willow.", "type": "dialogue", "target_id": "old_man_willow_npc"}},
-    {{"id": "interact_raven_dialogue", "name": "Try to communicate with the Mysterious Raven.", "type": "dialogue", "target_id": "mysterious_raven_npc"}}
+    {{"id": "enter_dark_forest", "name": "Venture east into the ominous dark forest.", "type": "navigate"}}
+    # Reordered slightly to keep 5 elements, replaced one with combat trigger
   ],
   "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes."
 }}
@@ -118,6 +120,53 @@ class LLMInterface:
 }}
 '''
             print("LLMInterface: Mock LLM call successful (npc_dialogue_response as JSON string).")
+            return mock_json_string
+        elif expected_response_type == 'combat_turn_outcome':
+            player_strategy_mentioned = "Unknown strategy"
+            if "Player Strategy:" in prompt_str:
+                try:
+                    player_strategy_mentioned = prompt_str.split("Player Strategy:")[1].split("\n")[0].strip()
+                except IndexError:
+                    pass # Keep default
+
+            target_npc_id = "generic_enemy_id_001" # Placeholder, could be parsed from prompt context in a real system
+            # Example: if "Target NPC ID: specific_id" in prompt_str: target_npc_id = ...
+
+            # Simple mock logic: Player hits, NPC takes damage. Combat continues for a few turns.
+            # A real system would need to check current HP from context.
+            # For this mock, let's assume combat ends after a hypothetical 3rd turn if we could track turns.
+            # Since we can't easily track turns here without more context, we'll mostly return combat_ended: false.
+
+            npc_hp_change = -10 # Player always hits for 10 in this mock
+            player_hp_change = 0 # Player always dodges in this mock
+            combat_ended_mock = False
+            victor_mock = None
+
+            # Could add logic here to make combat end sometimes, e.g. based on prompt content
+            # if "low health" in prompt_str.lower() and "player" in prompt_str.lower():
+            #    player_hp_change = -15 # Player gets hit hard
+            #    combat_ended_mock = True
+            #    victor_mock = "npc"
+
+            mock_json_string = f'''
+{{
+  "turn_summary_narrative": "Player uses '{player_strategy_mentioned}' against {target_npc_id}! It's a solid hit for {abs(npc_hp_change)} damage! {target_npc_id} stumbles back, then lunges wildly, but Player deftly dodges the attack.",
+  "player_hp_change": {player_hp_change},
+  "npc_hp_changes": [
+    {{"npc_id": "{target_npc_id}", "hp_change": {npc_hp_change}}}
+  ],
+  "combat_ended": {json.dumps(combat_ended_mock)},
+  "victor": {json.dumps(victor_mock)},
+  "player_strategy_feedback": "A well-executed '{player_strategy_mentioned}'!",
+  "available_player_strategies": [
+    {{"id": "attack_again_{player_strategy_mentioned.lower().replace(' ','_')}", "name": "Attack again with {player_strategy_mentioned}"}},
+    {{"id": "defensive_stance", "name": "Take a Defensive Stance"}},
+    {{"id": "use_item_healing_potion", "name": "Use Healing Potion (if available)"}},
+    {{"id": "try_flee", "name": "Attempt to Flee"}}
+  ]
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (combat_turn_outcome as JSON string).")
             return mock_json_string
         else:
             # Generic mock response for other types

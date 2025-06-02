@@ -221,6 +221,56 @@ class UIManager:
         user_input = input(f"\n{prompt_message} ").strip()
         return user_input
 
+    def show_combat_interface(self, player_hp: int, player_max_hp: int, combatants_info: list):
+        print("\n" + "="*20 + " COMBAT " + "="*20 + "\n")
+        print(f"Player HP: {player_hp}/{player_max_hp}")
+        print("--- Opponents ---")
+        if not combatants_info:
+            print("  (No opponents visible or combat ended)")
+        else:
+            for npc_info in combatants_info:
+                print(f"  - {npc_info.get('name', 'Unknown Combatant')} HP: {npc_info.get('hp', '?')}/{npc_info.get('max_hp', '?')}")
+        # Note: Player actions/strategies will be displayed separately by present_combat_strategies
+
+    def display_combat_narrative(self, text: str):
+        print("\n--- Combat Action ---")
+        print(text)
+
+    def update_combatants_status(self, updates: list): # Placeholder
+        print(f"[UI Placeholder: Combatant statuses updated: {updates}]")
+
+    def present_combat_strategies(self, strategies: list) -> str | None:
+        print("\n--- Choose Your Strategy ---")
+        if not strategies or not isinstance(strategies, list): # Added type check for robustness
+            print("No specific strategies available.")
+            return None
+
+        # display_interaction_menu might be too specific with its "INTERACTION MENU" header.
+        # Re-implementing the list display here for "Choose Your Strategy" context.
+        for i, strategy in enumerate(strategies):
+            if isinstance(strategy, dict):
+                display_name = strategy.get('name', strategy.get('id', 'Unnamed Strategy'))
+                print(f"  {i+1}. {display_name}")
+            else:
+                print(f"  {i+1}. (Malformed strategy data: {strategy})")
+
+        # Use existing get_player_action for selection logic
+        return self.get_player_action(strategies)
+
+    def show_combat_results(self, results_summary: str, victor: str | None): # victor can be None
+        print("\n" + "="*15 + " COMBAT ENDED " + "="*15 + "\n")
+        print(f"Outcome: {results_summary}")
+        if victor == 'player':
+            print("YOU ARE VICTORIOUS!")
+        elif victor == 'npc': # Assuming generic NPC win
+            print("You have been defeated.")
+        elif victor == 'draw':
+            print("The battle ends in a draw.")
+        else: # Covers None or other unexpected victor strings
+            print(f"Combat finished. Victor: {victor if victor else 'Undetermined'}")
+        print("="*46) # Matches header length roughly
+        input("\n--- Press Enter to continue ---")
+
     def display_narrative(self, text: str):
         print("\n" + "-"*10 + " NARRATIVE UPDATE " + "-"*10 + "\n")
         print(text)

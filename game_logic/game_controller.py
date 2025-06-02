@@ -21,8 +21,9 @@ class GameController:
         self.model_selector = model_selector
         self.adventure_setup = adventure_setup
         self.gwhr = gwhr
-        self.llm_interface = llm_interface # Store LLMInterface
+        self.llm_interface = llm_interface
         self.current_game_state: str = "INIT"
+        self.active_combat_data: dict = {} # Initialize active_combat_data
         # self.game_engine will be initialized later
 
     def request_and_validate_api_key(self) -> bool:
@@ -101,8 +102,291 @@ class GameController:
             self.ui_manager.display_message("GameController: Failed to generate or parse World Conception Document. GWHR not initialized.", "error")
             return False
 
+    def initiate_combat(self, npc_ids_to_engage: list):
+        self.current_game_state = "IN_COMBAT"
+        self.ui_manager.display_message("Combat initiated!", "info")
+
+        player_gwhr_state = self.gwhr.get_data_store().get('player_state', {})
+        player_attrs = player_gwhr_state.get('attributes', {})
+
+        self.active_combat_data = {
+            'turn': 0,
+            'player': {
+                'id': 'player',
+                'name': 'Player', # Could get player name if stored
+                'current_hp': player_attrs.get('current_hp', 100),
+                'max_hp': player_attrs.get('max_hp', 100),
+                'attack_power': player_attrs.get('attack_power', 10),
+                'defense_power': player_attrs.get('defense_power', 5),
+                'evasion_chance': player_attrs.get('evasion_chance', 0.1),
+                'hit_chance': player_attrs.get('hit_chance', 0.8)
+                # Not storing original_attributes for player here, as player_state in GWHR is the source of truth
+            },
+            'npcs': [],
+            # Initial strategies, can be updated by LLM combat outcomes
+            'last_turn_player_strategies': [
+                {"id": "standard_attack", "name": "Standard Attack"},
+                {"id": "power_attack", "name": "Power Attack (Low Hit, High Dmg)"},
+                {"id": "quick_attack", "name": "Quick Attack (High Hit, Low Dmg)"},
+                {"id": "defend", "name": "Defend"},
+                {"id": "try_flee", "name": "Attempt to Flee"}
+            ],
+            'combat_ended': False,
+            'victor': None,
+            'final_summary_narrative': '' # For storing the text that combat_loop will pass to show_combat_results
+        }
+
+        all_gwhr_npcs = self.gwhr.get_data_store().get('npcs', {})
+        for npc_id in npc_ids_to_engage:
+            npc_gwhr_data = all_gwhr_npcs.get(npc_id)
+            if not npc_gwhr_data:
+                self.ui_manager.display_message(f"Warning: NPC {npc_id} not found in GWHR for combat.", "warning")
+                continue
+
+            npc_attrs = npc_gwhr_data.get('attributes', {})
+            self.active_combat_data['npcs'].append({
+                'id': npc_id,
+                'name': npc_gwhr_data.get('name', npc_id),
+                'current_hp': npc_attrs.get('current_hp', 50), # Default if not in NPC's specific attrs
+                'max_hp': npc_attrs.get('max_hp', 50),
+                'attack_power': npc_attrs.get('attack_power', 8),
+                'defense_power': npc_attrs.get('defense_power', 3),
+                'evasion_chance': npc_attrs.get('evasion_chance', 0.05),
+                'hit_chance': npc_attrs.get('hit_chance', 0.7),
+                'original_gwhr_data_snapshot': copy.deepcopy(npc_gwhr_data) # Store snapshot for post-combat state update
+            })
+
+        if not self.active_combat_data['npcs']:
+            self.ui_manager.display_message("No valid opponents found to engage in combat.", "error")
+            self.current_game_state = "AWAITING_PLAYER_ACTION" # Revert state
+            self.active_combat_data = {} # Clear combat data
+            return
+
+        self.gwhr.log_event(f"Combat started against: {[npc['name'] for npc in self.active_combat_data['npcs']]}", event_type="combat_start")
+        self.combat_loop()
+
+    def combat_loop(self):
+        while self.current_game_state == "IN_COMBAT":
+            self.active_combat_data['turn'] += 1
+            self.ui_manager.display_message(f"\n--- Combat Turn {self.active_combat_data['turn']} ---", "info")
+
+            player_combat_data = self.active_combat_data['player']
+            # Only include NPCs with HP > 0 in the UI list and for LLM context
+            active_npc_combatants = [npc for npc in self.active_combat_data['npcs'] if npc.get('current_hp', 0) > 0]
+
+            npc_combatants_info_for_ui = [
+                {'name': n['name'], 'hp': n['current_hp'], 'max_hp': n['max_hp'], 'id': n['id']}
+                for n in active_npc_combatants
+            ]
+
+            # Check if combat should have ended before player gets to choose a strategy
+            # (e.g. if all NPCs were defeated by an environmental effect or prior DOT, though not implemented yet)
+            if not npc_combatants_info_for_ui and not self.active_combat_data.get('combat_ended'):
+                 self.ui_manager.display_message("All opponents appear to be defeated!", "info")
+                 self.active_combat_data['combat_ended'] = True
+                 self.active_combat_data['victor'] = 'player'
+                 self.active_combat_data.setdefault('final_summary_narrative', "With no more foes standing, the battle ends.")
+                 # Fall through to the combat_ended block below
+
+            self.ui_manager.show_combat_interface(
+                player_combat_data['current_hp'],
+                player_combat_data['max_hp'],
+                npc_combatants_info_for_ui
+            )
+
+            if self.active_combat_data.get('combat_ended'):
+                self.ui_manager.show_combat_results(
+                    self.active_combat_data.get('final_summary_narrative', "The dust settles."),
+                    self.active_combat_data.get('victor')
+                )
+
+                # Post-combat updates to GWHR
+                final_player_hp = self.active_combat_data['player']['current_hp']
+                # Get a fresh copy of player_state to modify, then update GWHR
+                player_state_gwhr = copy.deepcopy(self.gwhr.get_data_store().get('player_state', {}))
+                player_state_gwhr.setdefault('attributes', {})['current_hp'] = final_player_hp
+                self.gwhr.update_state({'player_state': player_state_gwhr})
+
+                # Update NPC states in GWHR based on their original snapshot + final combat HP
+                npcs_gwhr_full_update = copy.deepcopy(self.gwhr.get_data_store().get('npcs', {}))
+                for npc_combat_data in self.active_combat_data['npcs']: # Iterate through all initial combatants
+                    npc_id_to_update = npc_combat_data['id']
+                    if npc_id_to_update in npcs_gwhr_full_update: # Should always be true
+                        # Restore original data, then update HP and status
+                        restored_npc_data = copy.deepcopy(npc_combat_data['original_gwhr_data_snapshot'])
+                        restored_npc_data.setdefault('attributes', {})['current_hp'] = npc_combat_data['current_hp']
+                        if npc_combat_data['current_hp'] <= 0:
+                            restored_npc_data['status'] = 'defeated'
+                            # Log individual defeat only once if not already logged by LLM outcome processing
+                            # This specific log might be redundant if process_combat_turn also logs it.
+                            # For now, let's assume this is a summary log.
+                            # self.gwhr.log_event(f"NPC {npc_combat_data['name']} was defeated during combat resolution.", event_type="combat_npc_defeat", causal_factors=[f"npc:{npc_id_to_update}"])
+                        npcs_gwhr_full_update[npc_id_to_update] = restored_npc_data
+                    else: # NPC was somehow not in GWHR, add them (less likely path)
+                         npcs_gwhr_full_update[npc_id_to_update] = npc_combat_data['original_gwhr_data_snapshot']
+                         npcs_gwhr_full_update[npc_id_to_update].setdefault('attributes',{})['current_hp'] = npc_combat_data['current_hp']
+                         if npc_combat_data['current_hp'] <= 0: npcs_gwhr_full_update[npc_id_to_update]['status'] = 'defeated'
+
+                self.gwhr.update_state({'npcs': npcs_gwhr_full_update})
+
+                self.gwhr.log_event(
+                    f"Combat ended. Victor: {self.active_combat_data.get('victor', 'Unknown')}. Summary: {self.active_combat_data.get('final_summary_narrative', '')}",
+                    event_type="combat_end"
+                )
+                self.current_game_state = "AWAITING_PLAYER_ACTION"
+                self.active_combat_data = {} # Clear active combat data
+
+                # Refresh scene display after combat
+                current_scene_data_after_combat = self.gwhr.get_data_store().get('current_scene_data', {})
+                self.ui_manager.display_scene(current_scene_data_after_combat)
+                break # Exit combat loop
+
+            available_strategies = self.active_combat_data.get(
+                'last_turn_player_strategies',
+                [{"id": "standard_attack", "name": "Standard Attack"}] # Fallback default
+            )
+            player_chosen_strategy_id = self.ui_manager.present_combat_strategies(available_strategies)
+
+            if not player_chosen_strategy_id:
+                self.ui_manager.display_message("No strategy chosen, defaulting to 'defend'.", "warning")
+                player_chosen_strategy_id = "defend"
+
+            self.process_combat_turn(player_chosen_strategy_id)
+
+            time.sleep(0.1) # Small delay
+
+    def process_combat_turn(self, player_strategy_id: str):
+        self.ui_manager.display_message(f"Processing your strategy: {player_strategy_id}...", "info")
+
+        active_npcs_for_prompt = [
+            npc for npc in self.active_combat_data.get('npcs', []) if npc.get('current_hp', 0) > 0
+        ]
+        prompt_combatants_state = [{
+            'id': 'player',
+            'hp': self.active_combat_data['player']['current_hp'],
+            'attack_power': self.active_combat_data['player']['attack_power'], # Added missing base stats for player
+            'defense_power': self.active_combat_data['player']['defense_power'],
+            'evasion_chance': self.active_combat_data['player']['evasion_chance'],
+            'hit_chance': self.active_combat_data['player']['hit_chance']
+        }]
+        for npc_data in active_npcs_for_prompt:
+            prompt_combatants_state.append({
+                'id': npc_data['id'],
+                'name': npc_data['name'],
+                'hp': npc_data['current_hp'],
+                'attack_power': npc_data['attack_power'],  # Added missing base stats for NPCs
+                'defense_power': npc_data['defense_power'],
+                'evasion_chance': npc_data['evasion_chance'],
+                'hit_chance': npc_data['hit_chance']
+            })
+
+        # Include relevant parts of GWHR context, like player inventory for item use, skills etc.
+        # For now, keeping it simple as per initial plan.
+        # context_for_llm = self.gwhr.get_current_context() # Could be too large
+        # For combat, focus on combatant states and player's chosen strategy.
+
+        llm_prompt = (
+            f"Combat Turn: {self.active_combat_data['turn']}\n"
+            f"Player chose strategy: '{player_strategy_id}'.\n"
+            f"Current Combatants State (active ones): {json.dumps(prompt_combatants_state)}\n\n"
+            f"Task: Based on player's chosen strategy and current combatant states, determine the detailed outcome of this combat turn. "
+            f"Narrate the action and its results. Calculate HP changes for all affected combatants. "
+            f"Decide if the combat has ended (e.g., player defeated, or all NPCs defeated). "
+            f"Provide feedback on the player's strategy if appropriate. "
+            f"Suggest 3-4 available strategies for the player's next turn if combat continues. "
+            f"Output a single valid JSON object with fields: 'turn_summary_narrative' (string), "
+            f"'player_hp_change' (int, e.g., -5 for damage, 0 for no change, positive for healing), "
+            f"'npc_hp_changes' (list of objects, each like {{'npc_id': string, 'hp_change': int}}), "
+            f"'combat_ended' (boolean), 'victor' (string: 'player', 'npc', 'draw', or null if not ended), "
+            f"'player_strategy_feedback' (optional string), "
+            f"and 'available_player_strategies' (list of {{'id': string, 'name': string}} objects for next turn if combat is not ended)."
+        )
+
+        model_id = self.model_selector.get_selected_model()
+        if not model_id:
+            self.ui_manager.display_message("GameController: CRITICAL - No model selected for LLM call in combat!", "error")
+            self.active_combat_data.update({
+                'combat_ended': True,
+                'victor': 'error_no_model',
+                'final_summary_narrative': 'Critical Error: No LLM model available for combat simulation.'
+            })
+            return
+
+        outcome_json_str = self.llm_interface.generate(llm_prompt, model_id, expected_response_type='combat_turn_outcome')
+
+        outcome_data = {}
+        if not outcome_json_str:
+            self.ui_manager.display_message("GameController: LLM failed to provide combat outcome. Assuming a glancing blow from all sides.", "error")
+            outcome_data = {
+                "turn_summary_narrative": "The combatants eye each other warily; a tense moment passes with no major effect.",
+                "player_hp_change": 0, "npc_hp_changes": [], "combat_ended": False, "victor": None,
+                "available_player_strategies": self.active_combat_data.get('last_turn_player_strategies') # Reuse last strategies
+            }
+        else:
+            try:
+                outcome_data = json.loads(outcome_json_str)
+            except json.JSONDecodeError as e:
+                self.ui_manager.display_message(f"GameController: Error parsing combat outcome JSON from LLM: {e}. Assuming glancing blows.", "error")
+                outcome_data = {
+                    "turn_summary_narrative": f"Confusion in the ranks due to garbled orders (LLM Error: {e}). The turn yields no clear result.",
+                    "player_hp_change": 0, "npc_hp_changes": [], "combat_ended": False, "victor": None,
+                    "available_player_strategies": self.active_combat_data.get('last_turn_player_strategies')
+                }
+
+        # Apply updates from outcome_data to self.active_combat_data
+        player_c_data = self.active_combat_data['player']
+        player_c_data['current_hp'] += outcome_data.get('player_hp_change', 0)
+        player_c_data['current_hp'] = max(0, player_c_data['current_hp'])
+
+        for npc_hp_update in outcome_data.get('npc_hp_changes', []):
+            for npc_combatant in self.active_combat_data['npcs']:
+                if npc_combatant['id'] == npc_hp_update.get('npc_id'):
+                    npc_combatant['current_hp'] += npc_hp_update.get('hp_change', 0)
+                    npc_combatant['current_hp'] = max(0, npc_combatant['current_hp'])
+                    break
+
+        self.active_combat_data['last_turn_player_strategies'] = outcome_data.get(
+            'available_player_strategies',
+            self.active_combat_data.get('last_turn_player_strategies') # Keep old if new not provided
+        )
+        self.active_combat_data['combat_ended'] = outcome_data.get('combat_ended', False)
+        self.active_combat_data['victor'] = outcome_data.get('victor')
+        # Store this turn's narrative for display by combat_loop if combat ends.
+        self.active_combat_data['final_summary_narrative'] = outcome_data.get('turn_summary_narrative', "The turn ends without detailed narration.")
+
+        self.gwhr.log_event(
+            f"Combat Turn {self.active_combat_data['turn']}: Player chose '{player_strategy_id}'. Outcome: {outcome_data.get('turn_summary_narrative','')}",
+            event_type="combat_turn_detail",
+            payload=copy.deepcopy(outcome_data) # Log a copy of the full outcome
+        )
+        self.ui_manager.display_combat_narrative(outcome_data.get('turn_summary_narrative', "No narrative for turn outcome."))
+        if outcome_data.get('player_strategy_feedback'):
+            self.ui_manager.display_message(f"Feedback: {outcome_data.get('player_strategy_feedback')}", "info")
+
+        # Check for combat end conditions if LLM didn't explicitly state it but HP dropped
+        if not self.active_combat_data['combat_ended']:
+            if player_c_data['current_hp'] <= 0:
+                self.active_combat_data.update({
+                    'combat_ended': True,
+                    'victor': 'npc',
+                    'final_summary_narrative': self.active_combat_data.get('final_summary_narrative','') + " Player has fallen!"
+                })
+                self.gwhr.log_event("Player defeated in combat by HP loss.", event_type="combat_end_condition")
+
+            # Check if all active NPCs are defeated
+            # active_npcs_for_prompt already contains NPCs with HP > 0 at start of this method.
+            # We need to check based on current HP values in self.active_combat_data['npcs']
+            current_live_npcs = [n for n in self.active_combat_data['npcs'] if n['current_hp'] > 0]
+            if not current_live_npcs and self.active_combat_data['npcs']: # Ensure there were NPCs to begin with
+                self.active_combat_data.update({
+                    'combat_ended': True,
+                    'victor': 'player',
+                    'final_summary_narrative': self.active_combat_data.get('final_summary_narrative','') + " All opponents defeated!"
+                })
+                self.gwhr.log_event("All NPCs defeated in combat by HP loss.", event_type="combat_end_condition")
+
     def handle_npc_dialogue(self, npc_id: str, initial_player_input: str = None):
-        original_game_state = self.current_game_state
+        # original_game_state = self.current_game_state # Not strictly needed if we always aim for AWAITING_PLAYER_ACTION
         self.current_game_state = "NPC_DIALOGUE"
         self.ui_manager.display_message(f"\nStarting dialogue with NPC ID: {npc_id}...", "info")
 
@@ -111,7 +395,7 @@ class GameController:
 
         if not npc_data_snapshot:
             self.ui_manager.display_message(f"Error: NPC with ID '{npc_id}' not found in GWHR.", "error")
-            self.current_game_state = original_game_state
+            self.current_game_state = "AWAITING_PLAYER_ACTION" # Revert to a known safe state
             return
 
         npc_name = npc_data_snapshot.get('name', npc_id)
@@ -168,7 +452,7 @@ class GameController:
                 self.ui_manager.display_message(f"Error: {npc_name} seems lost for words (LLM failed to respond). Try again or type '/bye'.", "error")
                 player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
                 if player_input_for_llm.lower() in ["/bye", "/end"]:
-                    self.current_game_state = original_game_state
+                    self.current_game_state = "AWAITING_PLAYER_ACTION" # Exit dialogue
                 continue
 
             try:
@@ -177,7 +461,7 @@ class GameController:
                 self.ui_manager.display_message(f"Error: Received garbled response from {npc_name} (JSON Error: {e}). Snippet: {response_json_str[:100]}...", "error")
                 player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
                 if player_input_for_llm.lower() in ["/bye", "/end"]:
-                    self.current_game_state = original_game_state
+                    self.current_game_state = "AWAITING_PLAYER_ACTION" # Exit dialogue
                 continue
 
             npc_actual_response_text = dialogue_data.get('dialogue_text', f"({npc_name} seems unresponsive.)")
@@ -209,7 +493,7 @@ class GameController:
             )
 
             if npc_data_snapshot.get('status') == 'ending_dialogue':
-                self.current_game_state = original_game_state
+                self.current_game_state = "AWAITING_PLAYER_ACTION" # Dialogue ended by NPC
                 break
 
             if player_reply_options:
@@ -233,11 +517,12 @@ class GameController:
                 player_input_for_llm = self.ui_manager.get_free_text_input(f"Your reply to {npc_name} (or /bye to end): ")
 
             if player_input_for_llm.lower() in ["/bye", "/end"]:
-                self.current_game_state = original_game_state
+                self.current_game_state = "AWAITING_PLAYER_ACTION" # Player ends dialogue
 
         self.ui_manager.display_message(f"\nDialogue with {npc_name} ended.", "info")
+        # Ensure state is reverted if loop somehow exited while still NPC_DIALOGUE
         if self.current_game_state == "NPC_DIALOGUE":
-            self.current_game_state = original_game_state
+            self.current_game_state = "AWAITING_PLAYER_ACTION"
 
     def handle_npc_dialogue(self, npc_id: str, initial_player_input: str = None):
         original_game_state = self.current_game_state
@@ -528,16 +813,18 @@ class GameController:
 
         if chosen_element and chosen_element.get('type') == 'dialogue' and chosen_element.get('target_id'):
             npc_id_to_talk_to = chosen_element['target_id']
-            # Use the name of the chosen element as the initial player input for context
             initial_dialogue_input = f"Selected interaction: '{chosen_element.get('name', action_detail)}'"
             self.handle_npc_dialogue(npc_id_to_talk_to, initial_player_input=initial_dialogue_input)
-            # handle_npc_dialogue will manage game state and UI from here, including setting AWAITING_PLAYER_ACTION
-            # or reverting to original_game_state before dialogue.
-            # We need to ensure the game loop correctly re-evaluates after dialogue.
-            # If handle_npc_dialogue sets state to AWAITING_PLAYER_ACTION, game_loop will re-display scene.
-            return # End process_player_action here for dialogue actions.
+            return
+        elif chosen_element and chosen_element.get('type') == 'combat_trigger' and chosen_element.get('target_id'):
+            npc_id_to_engage = chosen_element['target_id']
+            # It's good practice to use .get with a fallback for name display
+            npc_name_display = chosen_element.get('name', npc_id_to_engage)
+            self.ui_manager.display_message(f"You chose to engage {npc_name_display} in combat!", "info")
+            self.initiate_combat(npc_ids_to_engage=[npc_id_to_engage])
+            return # Combat loop will take over.
 
-        # If not a dialogue action, proceed with generic action processing:
+        # If not a dialogue or combat_trigger action, proceed with generic action processing:
         context_for_llm = self.gwhr.get_current_context()
         current_scene_id_from_gwhr = context_for_llm.get('current_scene_data', {}).get('scene_id', 'UNKNOWN_SCENE')
 
