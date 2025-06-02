@@ -25,7 +25,8 @@ class GWHR: # GameWorldHistoryRecorder
             'current_scene_data': {},
             'player_state': copy.deepcopy(default_player_state),
             'npcs': {},
-            'combat_log': [] # New combat log
+            'combat_log': [],
+            'environmental_puzzle_log': {} # New puzzle log
         }
 
     def initialize(self, initial_world_data: dict):
