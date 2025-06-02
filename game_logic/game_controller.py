@@ -285,7 +285,7 @@ class GameController:
             f"'puzzle_state_changed' (boolean), 'updated_puzzle_elements_state' (optional dictionary of specific element state changes, e.g., {{'element_X': 'new_value'}}), "
             f"'new_clues_revealed' (optional list of strings or clue_ids representing new information gained), 'puzzle_solved' (boolean), "
             f"and 'solution_narrative' (optional string if solved)."
-          )
+        )
         model_id = self.model_selector.get_selected_model()
         if not model_id: 
             self.ui_manager.display_message("GameController: CRITICAL: No model selected for puzzle evaluation!", "error"); self.current_game_state = "AWAITING_PLAYER_ACTION"; return
@@ -708,7 +708,7 @@ class GameController:
             f"'puzzle_state_changed' (boolean), 'updated_puzzle_elements_state' (optional dictionary of specific element state changes, e.g., {{'element_X': 'new_value'}}), "
             f"'new_clues_revealed' (optional list of strings or clue_ids representing new information gained), 'puzzle_solved' (boolean), "
             f"and 'solution_narrative' (optional string if solved)."
-          )
+        )
         model_id = self.model_selector.get_selected_model()
         if not model_id: 
             self.ui_manager.display_message("GameController: CRITICAL: No model selected for puzzle evaluation!", "error"); self.current_game_state = "AWAITING_PLAYER_ACTION"; return
