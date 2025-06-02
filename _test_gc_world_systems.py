@@ -58,7 +58,7 @@ def mock_show_menu_capture_data_t2(menu_data_arg):
     # For this test, we only care about what's passed to show_game_systems_menu.
     # The internal display_knowledge_codex_ui will be called by real UIManager.
     print("MOCK ui.show_game_systems_menu called. Returning 'close_menu' to exit handle_game_menu loop.")
-    return 'close_menu'
+    return 'close_menu' 
 ui.show_game_systems_menu = mock_show_menu_capture_data_t2
 gc.handle_game_menu()
 assert captured_menu_data_t2 is not None, "show_game_systems_menu was not called"
@@ -79,7 +79,7 @@ def mock_llm_for_event_t3(prompt, model_id, expected_response_type):
         event_call_count_t3 += 1
         # Use a fixed event_id here because the one with API key is hard to predict in test
         return json.dumps({
-            "event_id": "test_quake_event_fixed",
+            "event_id": "test_quake_event_fixed", 
             "description": "A sudden tremor shakes the ground!",
             "effects_on_world": ["A nearby path is blocked."],
             "new_scene_id": None

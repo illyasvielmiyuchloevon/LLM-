@@ -12,7 +12,7 @@ class LLMInterface:
             print("LLMInterface: Error - API Key not available. Cannot make LLM call.")
             # In a real app, this might use UIManager or raise an exception
             return None
-
+        
         if not model_id:
             print("LLMInterface: Error - Model ID not provided. Cannot make LLM call.")
             return None
@@ -21,7 +21,7 @@ class LLMInterface:
         print(f"  Model ID: {model_id}")
         print(f"  Expected Response Type: {expected_response_type}")
         # Ensure prompt is a string before slicing, though type hint suggests it is.
-        prompt_str = str(prompt)
+        prompt_str = str(prompt) 
         print(f"  Prompt (first 100 chars): {prompt_str[:100]}...")
 
         # Simulate LLM call based on expected_response_type
@@ -83,7 +83,7 @@ class LLMInterface:
                     # or "NPC ID: actual_id" or "NPC Name: Actual Name"
                     # This is a very basic extraction for mock purposes.
                     # A more robust system would pass structured data about the target NPC.
-                    split_by_npc_tag = prompt_str.split("NPC:")
+                    split_by_npc_tag = prompt_str.split("NPC:") 
                     if len(split_by_npc_tag) > 1:
                          # Take the part after "NPC:", then take first line, strip spaces.
                         npc_name_in_prompt = split_by_npc_tag[1].split("\n")[0].strip()
@@ -128,9 +128,9 @@ class LLMInterface:
             if "Player Strategy:" in prompt_str:
                 try:
                     player_strategy_mentioned = prompt_str.split("Player Strategy:")[1].split("\n")[0].strip()
-                except IndexError:
+                except IndexError: 
                     pass # Keep default
-
+            
             target_npc_id = "generic_enemy_id_001" # Placeholder, could be parsed from prompt context in a real system
             # Example: if "Target NPC ID: specific_id" in prompt_str: target_npc_id = ...
 
@@ -138,18 +138,18 @@ class LLMInterface:
             # A real system would need to check current HP from context.
             # For this mock, let's assume combat ends after a hypothetical 3rd turn if we could track turns.
             # Since we can't easily track turns here without more context, we'll mostly return combat_ended: false.
-
+            
             npc_hp_change = -10 # Player always hits for 10 in this mock
             player_hp_change = 0 # Player always dodges in this mock
             combat_ended_mock = False
             victor_mock = None
-
+            
             # Could add logic here to make combat end sometimes, e.g. based on prompt content
             # if "low health" in prompt_str.lower() and "player" in prompt_str.lower():
             #    player_hp_change = -15 # Player gets hit hard
             #    combat_ended_mock = True
             #    victor_mock = "npc"
-
+            
             mock_json_string = f'''
 {{
   "turn_summary_narrative": "Player uses '{player_strategy_mentioned}' against {target_npc_id}! It's a solid hit for {abs(npc_hp_change)} damage! {target_npc_id} stumbles back, then lunges wildly, but Player deftly dodges the attack.",
@@ -205,7 +205,7 @@ class LLMInterface:
                 knowledge_from_puzzle = [{"topic_id": "lever_puzzle_feedback_A", "summary": "Pulling Lever A illuminated one of three green lights by the door.", "source_type": "puzzle_interaction", "source_detail": f"Puzzle {puzzle_id_in_prompt}, Element {action_in_prompt}"}]
             else: # Default for other actions
                 knowledge_from_puzzle = [] # Or None
-
+            
             mock_json_string = f'''
 {{
   "puzzle_id": "{puzzle_id_in_prompt}",
@@ -224,16 +224,16 @@ class LLMInterface:
             hint = "unknown_topic"
             source_type_echo = "unknown_source"
             source_detail_echo = "unknown_detail"
-            if "Context Hint:" in prompt_str:
+            if "Context Hint:" in prompt_str: 
                 try: hint = prompt_str.split("Context Hint:")[1].split("\n")[0].strip()
                 except IndexError: pass
-            if "Source Type:" in prompt_str:
+            if "Source Type:" in prompt_str: 
                 try: source_type_echo = prompt_str.split("Source Type:")[1].split("\n")[0].strip()
                 except IndexError: pass
-            if "Source Detail:" in prompt_str:
+            if "Source Detail:" in prompt_str: 
                 try: source_detail_echo = prompt_str.split("Source Detail:")[1].split("\n")[0].strip()
                 except IndexError: pass
-
+            
             mock_json_string = f'''
 {{
   "knowledge_id": "{hint.lower().replace(' ', '_')}_codex",
@@ -247,7 +247,7 @@ class LLMInterface:
             return mock_json_string
         elif expected_response_type == 'dynamic_event_outcome':
             hint = "unknown_event_trigger"
-            if "Event Hint:" in prompt_str:
+            if "Event Hint:" in prompt_str: 
                 try: hint = prompt_str.split("Event Hint:")[1].split("\n")[0].strip()
                 except IndexError: pass
 
@@ -266,7 +266,7 @@ class LLMInterface:
             if "Old Condition:" in prompt_str:
                 try: old_condition = prompt_str.split("Old Condition:")[1].split("\n")[0].strip()
                 except IndexError: pass
-
+            
             new_cond, new_int, new_desc = "stormy", "violent", "A sudden, violent thunderstorm erupts! Lightning flashes and thunder cracks overhead, making travel treacherous and visibility poor."
             if old_condition.lower() == "stormy": # Simple toggle for mock
                 new_cond, new_int, new_desc = "misty", "light", "The storm subsides, leaving a light, eerie mist clinging to everything. Visibility is reduced, and sounds are muffled."
@@ -302,8 +302,8 @@ class LLMInterface:
         # Create a URL-encoded snippet of the prompt for the placeholder URL.
         prompt_for_url = image_prompt_str[:30] # Max 30 chars for the text part of the URL
         url_encoded_prompt_snippet = urllib.parse.quote(prompt_for_url)
-
+        
         mock_image_url = f"https://via.placeholder.com/800x600.png?text=Scene:{url_encoded_prompt_snippet}"
-
+        
         print(f"LLMInterface: Mock Image LLM call successful. Returning URL: {mock_image_url}")
         return mock_image_url

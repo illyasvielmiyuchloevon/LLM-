@@ -34,7 +34,7 @@ if parsed_json:
     interactive_elements = parsed_json.get('interactive_elements', [])
     assert len(interactive_elements) == 5, \
         f"Expected 5 interactive elements, got {len(interactive_elements)}. Elements: {interactive_elements}"
-
+    
     expected_puzzle_elements_details = {
         "inspect_inscription_north_wall": {
             "name": "Inspect strange inscription (North Wall)",
@@ -47,7 +47,7 @@ if parsed_json:
             "puzzle_id": "lever_sequence_puzzle"
         }
     }
-
+    
     verified_expected_puzzles = set()
 
     for element in interactive_elements:
@@ -56,14 +56,14 @@ if parsed_json:
             puzzle_elements_found_count += 1
             assert 'puzzle_id' in element, \
                 f"Puzzle element '{element.get('id')}' must have a 'puzzle_id'"
-
+            
             element_id = element.get('id')
             if element_id in expected_puzzle_elements_details:
                 expected_details = expected_puzzle_elements_details[element_id]
                 assert element.get('name') == expected_details['name'], f"Name mismatch for {element_id}"
                 assert element.get('puzzle_id') == expected_details['puzzle_id'], f"Puzzle ID mismatch for {element_id}"
                 verified_expected_puzzles.add(element_id)
-
+            
     assert puzzle_elements_found_count >= 2, \
         f"Expected at least 2 puzzle elements, found {puzzle_elements_found_count}"
     assert len(verified_expected_puzzles) == len(expected_puzzle_elements_details), \

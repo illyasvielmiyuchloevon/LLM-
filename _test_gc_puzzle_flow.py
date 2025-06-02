@@ -15,8 +15,8 @@ ui = UIManager()
 akm = ApiKeyManager()
 llm = LLMInterface(akm)
 ms = ModelSelector(akm)
-adv_setup = AdventureSetup(ui, llm, ms)
-gwhr = GWHR()
+adv_setup = AdventureSetup(ui, llm, ms) 
+gwhr = GWHR() 
 gc = GameController(akm, ui, ms, adv_setup, gwhr, llm)
 
 akm.store_api_key("gc-puzzle-flow-key")
@@ -44,16 +44,16 @@ scene_with_puzzle_element = {
 }
 # Initialize GWHR and ensure scene_history and event_log are clean for this test
 gwhr.initialize({
-    "world_title": "Puzzle Test World",
+    "world_title": "Puzzle Test World", 
     "environmental_puzzle_log": copy.deepcopy(initial_puzzle_log_state)
 })
 gwhr.update_state({
-    'current_scene_data': scene_with_puzzle_element,
+    'current_scene_data': scene_with_puzzle_element, 
     'current_game_time': 1, # Start at time 1 for first action
-    'scene_history':[],
-    'event_log':[]
+    'scene_history':[], 
+    'event_log':[] 
 })
-gc.current_game_state = "AWAITING_PLAYER_ACTION"
+gc.current_game_state = "AWAITING_PLAYER_ACTION" 
 
 # --- Mock LLMInterface.generate for puzzle evaluation responses ---
 llm_puzzle_eval_call_count = 0
@@ -81,7 +81,7 @@ mock_puzzle_eval_responses = [
 
 original_llm_generate = llm.generate
 def mocked_llm_puzzle_eval_generator(prompt, model_id, expected_response_type):
-    global llm_puzzle_eval_call_count, puzzle_prompts_received
+    global llm_puzzle_eval_call_count, puzzle_prompts_received 
     puzzle_prompts_received.append(prompt)
     if expected_response_type == 'environmental_puzzle_solution_eval':
         if llm_puzzle_eval_call_count < len(mock_puzzle_eval_responses):
@@ -89,15 +89,15 @@ def mocked_llm_puzzle_eval_generator(prompt, model_id, expected_response_type):
             print(f"MOCK LLM (puzzle eval turn {llm_puzzle_eval_call_count + 1}) responding...")
             llm_puzzle_eval_call_count += 1
             return response
-        else:
+        else: 
             return json.dumps({"action_feedback_narrative": "The puzzle seems unresponsive."})
     elif expected_response_type == 'scene_description': # For image gen context or generic actions
          return json.dumps(gwhr.get_data_store()['current_scene_data']) # Return a valid scene desc
     return original_llm_generate(prompt, model_id, expected_response_type)
 
 llm.generate = mocked_llm_puzzle_eval_generator
-original_llm_generate_image = llm.generate_image
-def mock_generate_image_puzzle_test(image_prompt):
+original_llm_generate_image = llm.generate_image 
+def mock_generate_image_puzzle_test(image_prompt): 
     print(f"MOCK generate_image called for: {image_prompt[:50]}...")
     return "https://fakeurl.com/puzzle_scene.png"
 llm.generate_image = mock_generate_image_puzzle_test
@@ -110,9 +110,9 @@ puzzle_log_after_action1 = gwhr.get_data_store()['environmental_puzzle_log']
 assert llm_puzzle_eval_call_count == 1, "LLM puzzle eval not called once for Test 1"
 assert puzzle_log_after_action1[puzzle_id_test]['elements_state']['north_rune'] == "bright"
 assert "The altar seems to be waiting for something." in puzzle_log_after_action1[puzzle_id_test]['clues_found']
-assert puzzle_log_after_action1[puzzle_id_test]['status'] == "unsolved"
+assert puzzle_log_after_action1[puzzle_id_test]['status'] == "unsolved" 
 assert gc.current_game_state == "AWAITING_PLAYER_ACTION"
-assert gwhr.get_data_store()['current_game_time'] == 2
+assert gwhr.get_data_store()['current_game_time'] == 2 
 print("Test 1 assertions passed.")
 
 print("\n--- Test 2: Player places Gem on Altar ---")
@@ -121,11 +121,11 @@ gc.process_player_action("interact_element", "place_gem_on_altar")
 puzzle_log_after_action2 = gwhr.get_data_store()['environmental_puzzle_log']
 assert llm_puzzle_eval_call_count == 2, "LLM puzzle eval not called a second time for Test 2"
 assert puzzle_log_after_action2[puzzle_id_test]['elements_state']['altar_gem_slot'] == "gem_placed"
-assert puzzle_log_after_action2[puzzle_id_test]['elements_state']['south_rune'] == "bright"
+assert puzzle_log_after_action2[puzzle_id_test]['elements_state']['south_rune'] == "bright" 
 assert "All runes are now bright!" in puzzle_log_after_action2[puzzle_id_test]['clues_found']
-assert puzzle_log_after_action2[puzzle_id_test]['status'] == "solved"
+assert puzzle_log_after_action2[puzzle_id_test]['status'] == "solved" 
 assert gc.current_game_state == "AWAITING_PLAYER_ACTION"
-assert gwhr.get_data_store()['current_game_time'] == 3
+assert gwhr.get_data_store()['current_game_time'] == 3 
 print("Test 2 assertions passed.")
 
 event_log = gwhr.get_data_store()['event_log']
@@ -133,7 +133,7 @@ print(f"Event Log: {json.dumps(event_log, indent=2)}")
 puzzle_interaction_events = [e for e in event_log if e['type'] == 'puzzle_interaction']
 assert len(puzzle_interaction_events) == 2
 puzzle_update_events = [e for e in event_log if e['type'] == 'puzzle_update']
-assert len(puzzle_update_events) == 2
+assert len(puzzle_update_events) == 2 
 puzzle_solved_events = [e for e in event_log if e['type'] == 'puzzle_solved']
 assert len(puzzle_solved_events) == 1
 print("Event log assertions passed.")

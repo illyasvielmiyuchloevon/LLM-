@@ -10,7 +10,7 @@ class ModelSelector:
         if not api_key:
             print("ModelSelector: Error - API Key not available.") # Later, use UIManager
             return []
-
+        
         print("ModelSelector: Simulating Gemini API call to fetch available models...")
         # In a real scenario, this would involve an actual API call
         return ["gemini-2.5-pro-mock", "gemini-2.5-flash-mock"]

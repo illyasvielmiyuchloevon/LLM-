@@ -18,7 +18,7 @@ class AdventureSetup:
     def request_adventure_preference(self) -> str | None:
         # This method assumes ui_manager.show_adventure_preference_screen() will be implemented
         # and will return the text input from the user or None/empty if no input.
-
+        
         # UIManager.show_adventure_preference_screen() was implemented in a previous step
         preference_text = self.ui_manager.show_adventure_preference_screen()
 
@@ -43,7 +43,7 @@ class AdventureSetup:
         if not player_adventure_preference:
             self.ui_manager.display_message("AdventureSetup: Error - Adventure preference not set. Cannot generate blueprint.", "error")
             return None
-
+        
         if not selected_model_id:
             self.ui_manager.display_message("AdventureSetup: Error - Model not selected. Cannot generate blueprint.", "error")
             return None
@@ -60,8 +60,8 @@ class AdventureSetup:
 
         self.ui_manager.display_message("AdventureSetup: Requesting detailed world blueprint from LLM...", "info")
         blueprint_str = self.llm_interface.generate(
-            prompt,
-            selected_model_id,
+            prompt, 
+            selected_model_id, 
             expected_response_type='detailed_world_blueprint'
         )
 
@@ -72,7 +72,7 @@ class AdventureSetup:
         else:
             self.ui_manager.display_message("AdventureSetup: Failed to generate detailed world blueprint from LLM.", "error")
             return None
-
+            
     def get_detailed_world_blueprint(self) -> str | None:
         return self.detailed_world_blueprint
 
@@ -83,7 +83,7 @@ class AdventureSetup:
         if not detailed_blueprint:
             self.ui_manager.display_message("AdventureSetup: Error - Detailed World Blueprint not available. Cannot generate world conception.", "error")
             return None
-
+        
         if not selected_model_id:
             self.ui_manager.display_message("AdventureSetup: Error - Model not selected. Cannot generate world conception.", "error")
             return None

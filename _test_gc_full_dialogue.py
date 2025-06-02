@@ -46,7 +46,7 @@ scene_data = {
 # Initialize GWHR with player state, this NPC, and set current scene
 gwhr.initialize({
     "world_title": "Dialogue Flow Test", "initial_scene_id": "library_entrance",
-    "player_state": GWHR().get_data_store()['player_state'],
+    "player_state": GWHR().get_data_store()['player_state'], 
     "npcs": {npc_id: copy.deepcopy(initial_npc_data)}
 })
 gwhr.update_state({'current_scene_data': scene_data, 'current_game_time': 0, 'scene_history':[], 'event_log':[]})
@@ -68,11 +68,11 @@ dialogue_responses_sequence = [
         "npc_id": npc_id, "dialogue_text": "Ah, the prophecy... a weighty topic. It speaks of shadows and light. What more specific query burns in your mind?",
         "new_npc_status": "pensive", "attitude_towards_player_change": "+2",
         "knowledge_revealed": [{"topic_id": "prophecy_intro", "summary": "Zebediah confirms the prophecy exists and is complex."}],
-        "dialogue_options_for_player": []
+        "dialogue_options_for_player": [] 
     }),
     json.dumps({
         "npc_id": npc_id, "dialogue_text": "The shadow... it is known only as Morian. Now, I must rest. Ponder what you have learned.",
-        "new_npc_status": "ending_dialogue", "attitude_towards_player_change": "0",
+        "new_npc_status": "ending_dialogue", "attitude_towards_player_change": "0", 
         "knowledge_revealed": [{"topic_id": "shadow_name_morian", "summary": "The shadow is named Morian."}]
     })
 ]
@@ -90,28 +90,28 @@ def mocked_llm_dialogue_generator(prompt, model_id, expected_response_type):
         else:
             print("MOCK LLM (dialogue): Ran out of predefined responses!")
             return json.dumps({"dialogue_text": "I have nothing more to say.", "new_npc_status": "ending_dialogue"})
-    elif expected_response_type == 'scene_description':
+    elif expected_response_type == 'scene_description': 
          # This might be called by process_player_action if the action is NOT dialogue,
          # or by image generation part of process_player_action.
          print(f"MOCK LLM (scene_description type for non-dialogue or image prompt context) returning generic scene...")
          # Return a generic scene that won't interfere with dialogue choice counts
          return json.dumps({
-             "scene_id": "generic_action_outcome",
+             "scene_id": "generic_action_outcome", 
              "narrative":"A generic outcome occurred from a non-dialogue action or image generation.",
-             "interactive_elements": []
+             "interactive_elements": [] 
          })
     return original_llm_generate(prompt, model_id, expected_response_type)
 
 llm.generate = mocked_llm_dialogue_generator
 original_llm_generate_image = llm.generate_image
-def mock_generate_image_dialogue_test(image_prompt):
+def mock_generate_image_dialogue_test(image_prompt): 
     print(f"MOCK generate_image called with: {image_prompt[:50]}...")
     return "https://fakeurl.com/dialogue_test_img.png"
 llm.generate_image = mock_generate_image_dialogue_test
 
 print("\n--- Simulating Game Loop for Dialogue ---")
 try:
-    gc.game_loop()
+    gc.game_loop() 
 except EOFError:
     print("EOFError caught, as expected after consuming all piped dialogue inputs.")
 
@@ -131,7 +131,7 @@ if len(final_npc_state['dialogue_log']) == 3:
     expected_initial_player_input_for_log = "Selected interaction: 'Talk to Zebediah'"
     assert final_npc_state['dialogue_log'][0]['player'] == expected_initial_player_input_for_log
     assert final_npc_state['dialogue_log'][0]['npc'] == "Greetings. I sense you seek knowledge. What is it you wish to ask?"
-
+    
     # Player chose option 1 from first set: "Tell me about the ancient prophecy."
     # The 'player_input_for_llm' for the 2nd LLM call should reflect this.
     # The dialogue log for the second exchange should have this as player's part.

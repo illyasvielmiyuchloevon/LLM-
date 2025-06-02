@@ -28,16 +28,16 @@ player_initial_attrs = copy.deepcopy(player_attrs_template)
 player_initial_attrs.update({"current_hp": 100, "max_hp": 100, "attack_power": 12, "defense_power": 6})
 
 npc_id_goblin = "goblin_warrior_1"
-default_npc_attrs_template = {
-    "mood": "neutral", "disposition_towards_player": 0, "current_hp": 50, "max_hp": 50,
+default_npc_attrs_template = { 
+    "mood": "neutral", "disposition_towards_player": 0, "current_hp": 50, "max_hp": 50, 
     "attack_power": 8, "defense_power": 3, "evasion_chance": 0.05, "hit_chance": 0.7
 }
 npc_goblin_attributes = copy.deepcopy(default_npc_attrs_template)
 npc_goblin_attributes.update({"current_hp": 30, "max_hp": 30, "attack_power": 7, "defense_power": 2, "mood":"aggressive"})
 npc_goblin_data = {
     'id': npc_id_goblin, 'name': "Goblin Warrior", 'role': "Enemy", 'attributes': npc_goblin_attributes,
-    'status': 'hostile', 'skills': [], 'knowledge': [], 'status_effects': [],
-    'current_location_id': None, 'personality_traits': [], 'motivations': [],
+    'status': 'hostile', 'skills': [], 'knowledge': [], 'status_effects': [], 
+    'current_location_id': None, 'personality_traits': [], 'motivations': [], 
     'faction': None, 'dialogue_log': [], 'last_interaction_time': 0
 }
 scene_with_combat_trigger = {
@@ -51,11 +51,11 @@ scene_with_combat_trigger = {
 }
 gwhr.initialize({
     "world_title": "Combat Test Arena", "initial_scene_id": "battle_arena_entry",
-    "player_state": {"attributes": player_initial_attrs},
+    "player_state": {"attributes": player_initial_attrs}, 
     "npcs": {npc_id_goblin: copy.deepcopy(npc_goblin_data)}
 })
 gwhr.update_state({
-    'current_scene_data': scene_with_combat_trigger, 'current_game_time': 0,
+    'current_scene_data': scene_with_combat_trigger, 'current_game_time': 0, 
     'scene_history':[], 'event_log':[], 'combat_log':[]
 })
 # gc.current_game_state = "AWAITING_PLAYER_ACTION" # process_player_action will set its own state
@@ -66,20 +66,20 @@ combat_prompts_received = []
 mock_combat_outcomes = [
     json.dumps({
         "turn_summary_narrative": "Player attacks Goblin! Hits for 8 damage. Goblin retaliates, -5 HP to Player.",
-        "player_hp_change": -5, "npc_hp_changes": [{"npc_id": npc_id_goblin, "hp_change": -8}],
+        "player_hp_change": -5, "npc_hp_changes": [{"npc_id": npc_id_goblin, "hp_change": -8}], 
         "combat_ended": False, "victor": None, "player_strategy_feedback": "Direct attack worked!",
         "available_player_strategies": [{"id": "power_attack", "name": "Power Attack"}, {"id": "defend", "name": "Defend"}]
     }),
     json.dumps({
         "turn_summary_narrative": "Player uses Power Attack! Goblin defeated!",
-        "player_hp_change": 0, "npc_hp_changes": [{"npc_id": npc_id_goblin, "hp_change": -25}],
+        "player_hp_change": 0, "npc_hp_changes": [{"npc_id": npc_id_goblin, "hp_change": -25}], 
         "combat_ended": True, "victor": "player", "player_strategy_feedback": "Devastating Power Attack!",
-        "available_player_strategies": []
+        "available_player_strategies": [] 
     })
 ]
 original_llm_generate = llm.generate
 def mocked_llm_combat_generator(prompt, model_id, expected_response_type):
-    global llm_combat_call_count, combat_prompts_received
+    global llm_combat_call_count, combat_prompts_received 
     combat_prompts_received.append(prompt)
     if expected_response_type == 'combat_turn_outcome':
         if llm_combat_call_count < len(mock_combat_outcomes):
@@ -91,11 +91,11 @@ def mocked_llm_combat_generator(prompt, model_id, expected_response_type):
             print("MOCK LLM (combat): Ran out of predefined combat responses!")
             return json.dumps({"turn_summary_narrative": "Stalemate...", "player_hp_change": 0, "npc_hp_changes": [], "combat_ended": True, "victor": "draw"})
     # This mock no longer needs to handle 'scene_description' for initial scene load if we don't call game_loop
-    return original_llm_generate(prompt, model_id, expected_response_type)
+    return original_llm_generate(prompt, model_id, expected_response_type) 
 llm.generate = mocked_llm_combat_generator
 
 original_llm_generate_image = llm.generate_image
-def mock_generate_image_combat_test(image_prompt):
+def mock_generate_image_combat_test(image_prompt): 
     print(f"MOCK generate_image called for: {image_prompt[:50]}...")
     return "https://fakeurl.com/combat_test_img.png"
 llm.generate_image = mock_generate_image_combat_test
@@ -103,7 +103,7 @@ llm.generate_image = mock_generate_image_combat_test
 # --- Simulate combat flow by directly calling process_player_action that triggers initiate_combat ---
 if __name__ == "__main__":
     print("\n--- Directly testing combat initiation and loop via process_player_action ---")
-    action_id_to_trigger_combat = "fight_goblin"
+    action_id_to_trigger_combat = "fight_goblin" 
     gc.current_game_state = "AWAITING_PLAYER_ACTION" # State before player makes a choice in game_loop
 
     try:
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     print(f"Final Player HP: {final_player_state['attributes']['current_hp']}")
     assert final_player_state['attributes']['current_hp'] == 95, \
-        f"Player HP after combat incorrect. Expected 95, Got {final_player_state['attributes']['current_hp']}"
+        f"Player HP after combat incorrect. Expected 95, Got {final_player_state['attributes']['current_hp']}" 
 
     assert npc_id_goblin in final_npcs_state, f"Goblin NPC {npc_id_goblin} not found in final GWHR."
     final_goblin_data = final_npcs_state[npc_id_goblin]
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     expected_combat_end_summary = "Player uses Power Attack! Goblin defeated! All opponents defeated!"
     assert combat_end_event['payload']['summary'] == expected_combat_end_summary, \
         f"Combat end summary mismatch: Expected '{expected_combat_end_summary}', Got '{combat_end_event['payload']['summary']}'"
-
+    
     combat_turn_events = [e for e in event_log if e['type'] == 'combat_turn_detail']
     assert len(combat_turn_events) == 2, f"Expected 2 combat_turn_detail events, got {len(combat_turn_events)}"
 

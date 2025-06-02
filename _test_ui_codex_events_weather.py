@@ -16,7 +16,7 @@ mock_scene_with_weather = {
   "scene_id": "rainy_pass",
   "narrative": "The mountain pass is treacherous under the downpour.",
   "current_weather_in_scene": { # This key is what display_scene will look for
-      "condition": "rainy",
+      "condition": "rainy", 
       "intensity": "heavy",
       "effects_description": "A heavy rain lashes down, reducing visibility and making the path slick."
   },
@@ -38,9 +38,9 @@ print("\n--- Test 2: display_codex_entry_content ---")
 print("Expecting input: <enter> (for 'Press Enter to close entry')")
 entry_to_display = mock_codex_entries["lore_001"]
 ui.display_codex_entry_content(
-    entry_to_display.get('title','N/A'),
-    entry_to_display.get('content','N/A'),
-    entry_to_display.get('source_type','N/A'),
+    entry_to_display.get('title','N/A'), 
+    entry_to_display.get('content','N/A'), 
+    entry_to_display.get('source_type','N/A'), 
     entry_to_display.get('source_detail','N/A')
 )
 print("Test 2 Passed.")
@@ -56,11 +56,11 @@ print("\n--- Test 3: display_knowledge_codex_ui ---")
 
 print("\nTest 3.1: Select entry 1, close sub-screen, then exit codex (0)")
 print("Expecting inputs: 1 -> <enter> -> 0")
-action_result_1a = ui.display_knowledge_codex_ui(mock_codex_entries)
+action_result_1a = ui.display_knowledge_codex_ui(mock_codex_entries) 
 print(f"Codex UI returned (after selecting entry): {action_result_1a}")
 assert action_result_1a == ('viewed_entry', "lore_001"), f"Test 3.1a failed. Got {action_result_1a}"
 
-action_result_1b = ui.display_knowledge_codex_ui(mock_codex_entries)
+action_result_1b = ui.display_knowledge_codex_ui(mock_codex_entries) 
 print(f"Codex UI returned (after exiting): {action_result_1b}")
 assert action_result_1b == ('exit_codex', None), f"Test 3.1b failed. Got {action_result_1b}"
 print("Test 3.1 Passed.")
@@ -76,11 +76,11 @@ print("Test 3.2 Passed.")
 
 print("\nTest 3.3: Invalid selection then exit")
 print("Expecting inputs: xyz -> 0")
-action_result_invalid = ui.display_knowledge_codex_ui(mock_codex_entries)
+action_result_invalid = ui.display_knowledge_codex_ui(mock_codex_entries) 
 print(f"Codex UI (invalid input) returned: {action_result_invalid}")
 assert action_result_invalid == ('show_codex_again', None), f"Test 3.3a failed. Got {action_result_invalid}"
 
-action_result_exit_after_invalid = ui.display_knowledge_codex_ui(mock_codex_entries)
+action_result_exit_after_invalid = ui.display_knowledge_codex_ui(mock_codex_entries) 
 print(f"Codex UI (exit after invalid) returned: {action_result_exit_after_invalid}")
 assert action_result_exit_after_invalid == ('exit_codex', None), f"Test 3.3b failed. Got {action_result_exit_after_invalid}"
 print("Test 3.3 Passed.")

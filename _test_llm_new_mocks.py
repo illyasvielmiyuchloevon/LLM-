@@ -1,4 +1,4 @@
-import json
+import json 
 from api.api_key_manager import ApiKeyManager
 from api.llm_interface import LLMInterface
 
@@ -8,7 +8,7 @@ print("--- Test LLMInterface New Mock Responses (Codex, Dynamic Event, Weather) 
 akm = ApiKeyManager()
 akm.store_api_key("fake-api-key-for-new-mocks-test") # API Key stored
 llm_interface = LLMInterface(api_key_manager=akm)
-model_for_test = "gemini-pro-mock"
+model_for_test = "gemini-pro-mock" 
 
 # --- Test 1: Codex Entry Generation ---
 print("\n--- Test 1: expected_response_type == 'codex_entry_generation' ---")
@@ -49,7 +49,7 @@ print("Test 2 Passed.")
 
 # --- Test 3: Weather Update Description ---
 print("\n--- Test 3: expected_response_type == 'weather_update_description' ---")
-prompt3a = "Old Condition: clear"
+prompt3a = "Old Condition: clear" 
 response3a = llm_interface.generate(prompt=prompt3a, model_id=model_for_test, expected_response_type="weather_update_description")
 print(f"Raw Response 3a (Weather - clear to stormy):\n{response3a}")
 parsed_json3a = None
@@ -62,7 +62,7 @@ if parsed_json3a:
     assert parsed_json3a.get('new_weather_intensity') == "violent"
     assert "A sudden, violent thunderstorm erupts!" in parsed_json3a.get('weather_effects_description', '')
 
-prompt3b = "Old Condition: stormy"
+prompt3b = "Old Condition: stormy" 
 response3b = llm_interface.generate(prompt=prompt3b, model_id=model_for_test, expected_response_type="weather_update_description")
 print(f"Raw Response 3b (Weather - stormy to misty):\n{response3b}")
 parsed_json3b = None
@@ -74,7 +74,7 @@ if parsed_json3b:
     assert parsed_json3b.get('new_weather_condition') == "misty"
     assert parsed_json3b.get('new_weather_intensity') == "light"
 
-prompt3c = "Old Condition: misty"
+prompt3c = "Old Condition: misty" 
 response3c = llm_interface.generate(prompt=prompt3c, model_id=model_for_test, expected_response_type="weather_update_description")
 parsed_json3c = None
 try:
