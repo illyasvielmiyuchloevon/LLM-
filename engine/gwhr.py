@@ -5,7 +5,10 @@ class GWHR: # GameWorldHistoryRecorder
         default_player_state = {
             'attributes': {
                 "strength": 10, "dexterity": 10, "intelligence": 10,
-                "sanity": 100, "willpower": 100, "insight": 5
+                "sanity": 100, "willpower": 100, "insight": 5,
+                "current_hp": 100, "max_hp": 100,
+                "attack_power": 10, "defense_power": 5,
+                "evasion_chance": 0.1, "hit_chance": 0.8
             },
             'skills': [],
             'inventory': [],
@@ -20,71 +23,97 @@ class GWHR: # GameWorldHistoryRecorder
             'scene_history': [],
             'event_log': [],
             'current_scene_data': {},
-            'player_state': copy.deepcopy(default_player_state), # Initialize with default player state
-            'npcs': {} # Initialize NPC data store
+            'player_state': copy.deepcopy(default_player_state),
+            'npcs': {},
+            'combat_log': [] # New combat log
         }
 
     def initialize(self, initial_world_data: dict):
-        # Create a deep copy of the incoming data to avoid modifying the original
+        # Start by taking a deep copy of the defaults set in __init__
+        # This ensures all keys, including player_state and npcs, are initialized with their default structures.
+        temp_store = copy.deepcopy(self.data_store)
+
+        # Create a deep copy of the incoming initial_world_data to safely manipulate it
         processed_initial_data = copy.deepcopy(initial_world_data)
 
-        # Handle player_state separately: if present in initial_world_data, it overrides the default.
-        # Otherwise, the default from __init__ is kept.
+        # Handle player_state specifically: merge attributes, otherwise replace wholesale.
         if 'player_state' in processed_initial_data:
-            # Assume initial_world_data['player_state'] is complete if provided
-            self.data_store['player_state'] = copy.deepcopy(processed_initial_data.pop('player_state'))
-        # else: player_state remains as the default from __init__
+            incoming_ps = processed_initial_data.pop('player_state') # Remove from processed_initial_data
 
-        # Update the rest of self.data_store with other keys from initial_world_data
-        # This will overwrite common keys like 'world_title' if present in processed_initial_data,
-        # and add any other new keys from processed_initial_data.
-        self.data_store.update(processed_initial_data)
+            # Merge attributes: default attributes < incoming attributes
+            # Ensure target_ps['attributes'] exists if it somehow didn't from __init__ (it should)
+            target_ps_attributes = temp_store['player_state'].setdefault('attributes', {})
+            if 'attributes' in incoming_ps: # Check if incoming_ps has attributes to merge
+                incoming_player_attributes = incoming_ps.get('attributes', {})
+                target_ps_attributes.update(incoming_player_attributes) # Update existing attributes dict
 
-        # Ensure other GWHR specific keys (not player_state which is handled above)
-        # have their defaults from __init__ if not provided by initial_world_data
-        # This setdefault logic ensures they exist if initial_world_data was minimal.
-        self.data_store.setdefault('current_game_time', 0)
-        self.data_store.setdefault('scene_history', [])
-        self.data_store.setdefault('event_log', [])
-        self.data_store.setdefault('current_scene_data', {})
-        # 'npcs' is initialized in __init__ and potentially populated below.
-        # 'player_state' is handled above.
+            # For other top-level keys in player_state (skills, inventory, equipment_slots, current_location_id),
+            # if they are present in incoming_ps, they replace the defaults.
+            # If not present, the defaults from __init__ (already in temp_store['player_state']) remain.
+            for key in ['skills', 'inventory', 'equipment_slots', 'current_location_id']:
+                if key in incoming_ps:
+                    temp_store['player_state'][key] = copy.deepcopy(incoming_ps[key])
 
-        # Process main_characters from WCD into the new NPC structure
+        # If 'player_state' not in processed_initial_data, temp_store['player_state'] (from __init__) is used.
+
+        # Handle npcs specifically if 'main_characters' are provided in original initial_world_data
         if 'main_characters' in initial_world_data and isinstance(initial_world_data['main_characters'], list):
+            default_npc_attributes_template = { # Template for defaults for each NPC
+                "mood": "neutral", "disposition_towards_player": 0,
+                "current_hp": 50, "max_hp": 50,
+                "attack_power": 8, "defense_power": 3,
+                "evasion_chance": 0.05, "hit_chance": 0.7
+            }
             processed_npcs = {}
-            for char_data in initial_world_data['main_characters']: # char_data is from WCD
+            for char_data in initial_world_data['main_characters']:
                 npc_id = char_data.get('id', char_data.get('name', '').lower().replace(' ', '_'))
                 if not npc_id:
                     print(f"GWHR Warning: Skipping character due to missing id/name: {char_data}")
                     continue
 
+                # Merge attributes: default_npc_attributes_template < char_data.attributes
+                current_npc_attributes = copy.deepcopy(default_npc_attributes_template)
+                if isinstance(char_data.get('attributes'), dict):
+                    current_npc_attributes.update(char_data.get('attributes'))
+
                 processed_npcs[npc_id] = {
                     'id': npc_id,
                     'name': char_data.get('name', 'Unknown NPC'),
-                    'description': char_data.get('description', ''), # From WCD
-                    'role': char_data.get('role', 'character'),       # From WCD
-                    # New detailed fields with defaults if not in char_data (which they won't be from current WCD)
-                    'attributes': char_data.get('attributes', {"mood": "neutral", "disposition_towards_player": 0}),
+                    'description': char_data.get('description', ''),
+                    'role': char_data.get('role', 'character'),
+                    'attributes': current_npc_attributes, # Use merged attributes
                     'skills': char_data.get('skills', []),
-                    'knowledge': char_data.get('knowledge', []), # Topics NPC knows about
-                    'current_hp': char_data.get('current_hp', 100),
-                    'max_hp': char_data.get('max_hp', 100),
-                    'status_effects': char_data.get('status_effects', []), # e.g., ["poisoned", "blessed"]
+                    'knowledge': char_data.get('knowledge', []),
+                    'status_effects': char_data.get('status_effects', []),
                     'current_location_id': char_data.get('current_location_id', None),
                     'personality_traits': char_data.get('personality_traits', []),
                     'motivations': char_data.get('motivations', []),
                     'faction': char_data.get('faction', None),
-                    'dialogue_log': [], # Initialize empty dialogue log for each NPC
-                    'last_interaction_time': 0 # Game time of last significant interaction
+                    'dialogue_log': [],
+                    'last_interaction_time': 0
                 }
-            self.data_store['npcs'] = processed_npcs # Replace default {} with processed NPCs
-        elif 'npcs' not in self.data_store: # Ensure 'npcs' key exists if not in WCD and somehow missed in __init__
-             self.data_store['npcs'] = {}
+            temp_store['npcs'] = processed_npcs # Replace the initial empty 'npcs' dict
+        # If 'main_characters' not in initial_world_data, temp_store keeps the 'npcs': {} from __init__
+
+        # Update temp_store with any remaining keys from processed_initial_data (e.g. world_title)
+        # This will overwrite keys in temp_store if they also exist in processed_initial_data
+        temp_store.update(processed_initial_data)
+
+        # Ensure other core GWHR keys are present (mostly as a safeguard, __init__ sets them)
+        temp_store.setdefault('current_game_time', 0)
+        temp_store.setdefault('scene_history', [])
+        temp_store.setdefault('event_log', [])
+        temp_store.setdefault('current_scene_data', {})
+        temp_store.setdefault('combat_log', [])
+
+        self.data_store = temp_store # Assign the fully constructed store
 
         print(f"GWHR: Initialized/Merged with world data. World Title: '{self.data_store.get('world_title', 'N/A')}'")
         print(f"GWHR: Player state attributes: {self.data_store.get('player_state', {}).get('attributes')}")
         print(f"GWHR: NPC data processed. Found {len(self.data_store.get('npcs', {}))} NPCs.")
+        if len(self.data_store.get('npcs', {})) > 0:
+            first_npc_id = list(self.data_store['npcs'].keys())[0]
+            print(f"GWHR: First NPC ({first_npc_id}) attributes: {self.data_store['npcs'][first_npc_id].get('attributes')}")
 
     def log_event(self, event_description: str, event_type: str = "general", causal_factors: list = None):
         event_log = self.data_store.setdefault('event_log', [])
@@ -117,15 +146,14 @@ class GWHR: # GameWorldHistoryRecorder
                     'narrative_snippet': (new_scene_data.get('narrative', '')[:50] + "...") if new_scene_data.get('narrative') else "N/A...",
                     'image_url': new_scene_data.get('background_image_url'),
                     'image_prompt_elements': new_scene_data.get('image_prompt_elements'),
-                    'num_interactive_elements': len(new_scene_data.get('interactive_elements', [])) # New
+                    'num_interactive_elements': len(new_scene_data.get('interactive_elements', []))
                 }
                 scene_history.append(scene_summary)
                 updated_keys.append(key)
-            elif key == 'current_game_time': # Make sure game time is not deepcopied if it's just an int
+            elif key == 'current_game_time':
                  self.data_store[key] = value
                  updated_keys.append(key)
             else:
-                # Deepcopy other updates for safety
                 self.data_store[key] = copy.deepcopy(value)
                 updated_keys.append(key)
 
@@ -134,13 +162,9 @@ class GWHR: # GameWorldHistoryRecorder
         else:
              print(f"GWHR: Update_state called with no keys to update or empty updates dictionary.")
 
-
     def get_current_context(self, granularity: str = "full", context_type: str = "general") -> dict:
         print("GWHR: get_current_context currently returns a full copy. This will be refined for targeted context provision.")
-        # This is a placeholder. Real implementation would filter and structure
-        # the context based on granularity and context_type.
-        return copy.deepcopy(self.data_store) # Return a deep copy
+        return copy.deepcopy(self.data_store)
 
     def get_data_store(self) -> dict:
-        # Returns a deep copy of the entire data store
         return copy.deepcopy(self.data_store)
