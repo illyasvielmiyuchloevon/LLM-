@@ -60,14 +60,14 @@ class LLMInterface:
     {{"name": "Mysterious Raven", "status": "observing you intently from a nearby branch", "dialogue_hook": "Caw! (It seems to suggest you choose wisely.)"}}
   ],
   "interactive_elements": [
-    {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}},
+    {{"id": "inspect_inscription_north_wall", "name": "Inspect strange inscription (North Wall)", "type": "puzzle_element", "puzzle_id": "rune_door_puzzle" }},
     {{"id": "challenge_raven_combat", "name": "Challenge the Mysterious Raven!", "type": "combat_trigger", "target_id": "mysterious_raven_npc"}},
-    {{"id": "inspect_signpost_detail", "name": "Examine the weathered signpost closely.", "type": "examine", "target_id": "signpost_object"}},
+    {{"id": "pull_rusty_lever_A", "name": "Pull the rusty lever (Lever A)", "type": "puzzle_element", "puzzle_id": "lever_sequence_puzzle"}},
     {{"id": "talk_to_old_man_willow", "name": "Talk to Old Man Willow.", "type": "dialogue", "target_id": "old_man_willow_npc"}},
-    {{"id": "enter_dark_forest", "name": "Venture east into the ominous dark forest.", "type": "navigate"}}
-    # Reordered slightly to keep 5 elements, replaced one with combat trigger
+    {{"id": "go_north_mountains", "name": "Head north towards the towering mountains.", "type": "navigate"}}
+    # Replaced 'inspect_signpost_detail' and 'enter_dark_forest' with puzzle elements
   ],
-  "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes."
+  "environmental_effects": "A gentle breeze rustles the leaves on the trees. The distant cry of a bird echoes. You notice strange symbols on the north wall and a rusty lever near the east passage."
 }}
 '''
             print("LLMInterface: Mock LLM call successful (scene_description as JSON string).")
@@ -167,6 +167,51 @@ class LLMInterface:
 }}
 '''
             print("LLMInterface: Mock LLM call successful (combat_turn_outcome as JSON string).")
+            return mock_json_string
+        elif expected_response_type == 'environmental_puzzle_solution_eval':
+            puzzle_id_in_prompt = "unknown_puzzle"
+            action_in_prompt = "unknown_action"
+
+            # Simplified extraction from prompt_str
+            if "Puzzle ID:" in prompt_str:
+                try:
+                    puzzle_id_in_prompt = prompt_str.split("Puzzle ID:")[1].split("\n")[0].strip()
+                except IndexError: pass
+            if "Action:" in prompt_str:
+                try:
+                    action_in_prompt = prompt_str.split("Action:")[1].split("\n")[0].strip()
+                except IndexError: pass
+
+            solved_this_turn = False
+            feedback_narrative = f"Player attempts action '{action_in_prompt}' on puzzle '{puzzle_id_in_prompt}'. Nothing obvious happens."
+            updated_elements = {} # Using dict instead of None for json.dumps if empty
+            new_clues = [] # Using list instead of None for json.dumps if empty
+            solution_narrative_text = None
+
+            # Mock logic: if action is 'use_sunstone_on_altar' for 'rune_door_puzzle', solve it.
+            if puzzle_id_in_prompt == "rune_door_puzzle" and action_in_prompt == "use_sunstone_on_altar":
+                solved_this_turn = True
+                feedback_narrative = "You place the Sunstone onto the altar. It flares with a brilliant light!"
+                updated_elements = {"altar_state": "sunstone_placed", "door_runes": "all_glowing"}
+                new_clues = ["The door seems to hum with energy."]
+                solution_narrative_text = "The massive stone door groans and slides open, revealing a dark passage!"
+            elif puzzle_id_in_prompt == "lever_sequence" and action_in_prompt == "pull_lever_A":
+                feedback_narrative = "You pull Lever A. A distant click is heard."
+                updated_elements = {"lever_A_state": "down"}
+                new_clues = ["One of the three lights above the door now glows green."]
+
+            mock_json_string = f'''
+{{
+  "puzzle_id": "{puzzle_id_in_prompt}",
+  "action_feedback_narrative": "{feedback_narrative}",
+  "puzzle_state_changed": {json.dumps(bool(updated_elements) or solved_this_turn)},
+  "updated_puzzle_elements_state": {json.dumps(updated_elements if updated_elements else None)},
+  "new_clues_revealed": {json.dumps(new_clues if new_clues else None)},
+  "puzzle_solved": {json.dumps(solved_this_turn)},
+  "solution_narrative": {json.dumps(solution_narrative_text)}
+}}
+'''
+            print("LLMInterface: Mock LLM call successful (environmental_puzzle_solution_eval as JSON string).")
             return mock_json_string
         else:
             # Generic mock response for other types
